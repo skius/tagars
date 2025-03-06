@@ -340,17 +340,19 @@ fn spawn_food(ctx: &ReducerContext, _schedule: SpawnFoodSchedule) {
         return;
     }
 
-    let food = Food {
-        id: 0,
-        x: ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_X - Ball::WORLD_BORDER_MIN_X) + Ball::WORLD_BORDER_MIN_X,
-        y: ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_Y - Ball::WORLD_BORDER_MIN_Y) + Ball::WORLD_BORDER_MIN_Y,
-        color: Rgb {
-            r: ctx.random(),
-            g: ctx.random(),
-            b: ctx.random(),
-        },
-    };
-    ctx.db.foods().insert(food);
+    for _ in 0..100 {
+        let food = Food {
+            id: 0,
+            x: ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_X - Ball::WORLD_BORDER_MIN_X) + Ball::WORLD_BORDER_MIN_X,
+            y: ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_Y - Ball::WORLD_BORDER_MIN_Y) + Ball::WORLD_BORDER_MIN_Y,
+            color: Rgb {
+                r: ctx.random(),
+                g: ctx.random(),
+                b: ctx.random(),
+            },
+        };
+        ctx.db.foods().insert(food);
+    }
 }
 
 #[spacetimedb::reducer(init)]
@@ -366,7 +368,7 @@ pub fn init(ctx: &ReducerContext) {
     // Add scheduler for spawn_food
     let schedule = SpawnFoodSchedule {
         scheduled_id: 0,
-        scheduled_at: TimeDuration::from_micros(20_000).into(),
+        scheduled_at: TimeDuration::from_micros(200_000).into(),
     };
     ctx.db.spawn_foods_schedule().insert(schedule);
 }
