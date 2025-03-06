@@ -9,6 +9,9 @@ pub mod ball_type;
 pub mod balls_table;
 pub mod identity_connected_reducer;
 pub mod identity_disconnected_reducer;
+pub mod respawn_ball_reducer;
+pub mod respawn_balls_schedule_table;
+pub mod respawn_balls_schedule_type;
 pub mod rgb_type;
 pub mod update_balls_reducer;
 pub mod update_balls_schedule_table;
@@ -25,6 +28,9 @@ pub use identity_connected_reducer::{
 pub use identity_disconnected_reducer::{
     identity_disconnected, set_flags_for_identity_disconnected, IdentityDisconnectedCallbackId,
 };
+pub use respawn_ball_reducer::{respawn_ball, set_flags_for_respawn_ball, RespawnBallCallbackId};
+pub use respawn_balls_schedule_table::*;
+pub use respawn_balls_schedule_type::RespawnBallsSchedule;
 pub use rgb_type::Rgb;
 pub use update_balls_reducer::{set_flags_for_update_balls, update_balls, UpdateBallsCallbackId};
 pub use update_balls_schedule_table::*;
@@ -41,6 +47,7 @@ pub enum Reducer {
     ApplyImpulse { impulse_x: f64, impulse_y: f64 },
     IdentityConnected,
     IdentityDisconnected,
+    RespawnBall { schedule: RespawnBallsSchedule },
     UpdateBalls { schedule: UpdateBallsSchedule },
 }
 
@@ -54,6 +61,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::ApplyImpulse { .. } => "apply_impulse",
             Reducer::IdentityConnected => "identity_connected",
             Reducer::IdentityDisconnected => "identity_disconnected",
+            Reducer::RespawnBall { .. } => "respawn_ball",
             Reducer::UpdateBalls { .. } => "update_balls",
         }
     }
@@ -74,6 +82,13 @@ impl TryFrom<__ws::ReducerCallInfo<__ws::BsatnFormat>> for Reducer {
                 identity_disconnected_reducer::IdentityDisconnectedArgs,
             >("identity_disconnected", &value.args)?
             .into()),
+            "respawn_ball" => Ok(
+                __sdk::parse_reducer_args::<respawn_ball_reducer::RespawnBallArgs>(
+                    "respawn_ball",
+                    &value.args,
+                )?
+                .into(),
+            ),
             "update_balls" => Ok(
                 __sdk::parse_reducer_args::<update_balls_reducer::UpdateBallsArgs>(
                     "update_balls",
@@ -96,6 +111,7 @@ impl TryFrom<__ws::ReducerCallInfo<__ws::BsatnFormat>> for Reducer {
 #[doc(hidden)]
 pub struct DbUpdate {
     balls: __sdk::TableUpdate<Ball>,
+    respawn_balls_schedule: __sdk::TableUpdate<RespawnBallsSchedule>,
     update_balls_schedule: __sdk::TableUpdate<UpdateBallsSchedule>,
 }
 
@@ -106,6 +122,10 @@ impl TryFrom<__ws::DatabaseUpdate<__ws::BsatnFormat>> for DbUpdate {
         for table_update in raw.tables {
             match &table_update.table_name[..] {
                 "balls" => db_update.balls = balls_table::parse_table_update(table_update)?,
+                "respawn_balls_schedule" => {
+                    db_update.respawn_balls_schedule =
+                        respawn_balls_schedule_table::parse_table_update(table_update)?
+                }
                 "update_balls_schedule" => {
                     db_update.update_balls_schedule =
                         update_balls_schedule_table::parse_table_update(table_update)?
@@ -139,6 +159,12 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.balls = cache
             .apply_diff_to_table::<Ball>("balls", &self.balls)
             .with_updates_by_pk(|row| &row.identity);
+        diff.respawn_balls_schedule = cache
+            .apply_diff_to_table::<RespawnBallsSchedule>(
+                "respawn_balls_schedule",
+                &self.respawn_balls_schedule,
+            )
+            .with_updates_by_pk(|row| &row.scheduled_id);
         diff.update_balls_schedule = cache
             .apply_diff_to_table::<UpdateBallsSchedule>(
                 "update_balls_schedule",
@@ -155,6 +181,7 @@ impl __sdk::DbUpdate for DbUpdate {
 #[doc(hidden)]
 pub struct AppliedDiff<'r> {
     balls: __sdk::TableAppliedDiff<'r, Ball>,
+    respawn_balls_schedule: __sdk::TableAppliedDiff<'r, RespawnBallsSchedule>,
     update_balls_schedule: __sdk::TableAppliedDiff<'r, UpdateBallsSchedule>,
 }
 
@@ -169,6 +196,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks: &mut __sdk::DbCallbacks<RemoteModule>,
     ) {
         callbacks.invoke_table_row_callbacks::<Ball>("balls", &self.balls, event);
+        callbacks.invoke_table_row_callbacks::<RespawnBallsSchedule>(
+            "respawn_balls_schedule",
+            &self.respawn_balls_schedule,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<UpdateBallsSchedule>(
             "update_balls_schedule",
             &self.update_balls_schedule,
@@ -750,6 +782,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
 
     fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         balls_table::register_table(client_cache);
+        respawn_balls_schedule_table::register_table(client_cache);
         update_balls_schedule_table::register_table(client_cache);
     }
 }

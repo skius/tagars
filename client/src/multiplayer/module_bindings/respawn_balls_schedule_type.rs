@@ -4,21 +4,14 @@
 #![allow(unused, clippy::all)]
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
-use super::rgb_type::Rgb;
-
 #[derive(__lib::ser::Serialize, __lib::de::Deserialize, Clone, PartialEq, Debug)]
 #[sats(crate = __lib)]
-pub struct Ball {
-    pub identity: __sdk::Identity,
-    pub x: f64,
-    pub y: f64,
-    pub vx: f64,
-    pub vy: f64,
-    pub radius: f64,
-    pub color: Rgb,
-    pub dead: bool,
+pub struct RespawnBallsSchedule {
+    pub scheduled_id: u64,
+    pub scheduled_at: __sdk::ScheduleAt,
+    pub respawn_for_identity: __sdk::Identity,
 }
 
-impl __sdk::InModule for Ball {
+impl __sdk::InModule for RespawnBallsSchedule {
     type Module = super::RemoteModule;
 }
