@@ -21,7 +21,7 @@ use teng::rendering::color::Color;
 use teng::rendering::render::{HalfBlockDisplayRender, Render};
 use teng::util::for_coord_in_line;
 use crate::balls_interpolator::BallsInterpolatorComponent;
-use crate::multiplayer::{Ball, ReceiveMessage, SendMessage};
+use crate::multiplayer::{Ball, Food, ReceiveMessage, SendMessage};
 use crate::slingshot::SlingshotComponent;
 use crate::world::{World, WorldComponent};
 
@@ -77,6 +77,7 @@ struct GameState {
     world: World,
     raw_balls: HashMap<Identity, OldAndNewBall>,
     balls: HashMap<Identity, Ball>,
+    foods: HashMap<u64, Food>,
     receive_rx: Option<Receiver<ReceiveMessage>>,
     send_tx: Option<Sender<SendMessage>>,
     our_identity: Option<Identity>,
@@ -131,6 +132,15 @@ impl GameComponent {
                 ReceiveMessage::OurIdentity(identity) => {
                     game_state.our_identity = Some(identity);
                 }
+                ReceiveMessage::NewFood(food) => {
+                    game_state.foods.insert(food.id, food);
+                }
+                ReceiveMessage::UpdateFood(food) => {
+                    game_state.foods.insert(food.id, food);
+                }
+                ReceiveMessage::DeleteFood(id) => {
+                    game_state.foods.remove(&id);
+                }
             }
         }
     }
@@ -149,5 +159,44 @@ impl Component<GameState> for GameComponent {
         self.apply_messages(&mut shared_state.custom);
 
         shared_state.debug_info.custom.insert("balls_length".to_string(), format!("balls: {}", shared_state.custom.balls.len()));
+        
+        
+        // listen to keyboard events to apply impulses
+        let impulse_strength = 10.0;
+        let mut impulse = (0.0, 0.0);
+        if shared_state.pressed_keys.did_press_char_ignore_case('w') || shared_state.pressed_keys.did_press(KeyCode::Up) {
+            impulse.1 += impulse_strength;
+        }
+        if shared_state.pressed_keys.did_press_char_ignore_case('a') || shared_state.pressed_keys.did_press(KeyCode::Left) {
+            impulse.0 -= impulse_strength;
+        }
+        if shared_state.pressed_keys.did_press_char_ignore_case('s') || shared_state.pressed_keys.did_press(KeyCode::Down) {
+            impulse.1 -= impulse_strength;
+        }
+        if shared_state.pressed_keys.did_press_char_ignore_case('d') || shared_state.pressed_keys.did_press(KeyCode::Right) {
+            impulse.0 += impulse_strength;
+        }
+        
+        if impulse != (0.0, 0.0) {
+            let message = SendMessage::Impulse(impulse.0, impulse.1);
+            shared_state.custom.sender().send(message).unwrap();
+        }
+        
+        
+        // use mouse look dir to apply impulse
+        let (x, y) = shared_state.mouse_info.last_mouse_pos;
+        let x = x as i64;
+        let y = y as i64;
+        // compute diff to center
+        let center_x = shared_state.display_info.width() as i64 / 2;
+        let center_y = shared_state.display_info.height() as i64 / 2;
+        let diff_x = x - center_x;
+        let diff_y = y - center_y;
+        let diff_y = -2*diff_y; // pixel ratio of 2, upside down
+        
+        if shared_state.pressed_keys.did_press_char(' ') {
+            let message = SendMessage::Impulse(diff_x as f64, diff_y as f64);
+            shared_state.custom.sender().send(message).unwrap();
+        }
     }
 }

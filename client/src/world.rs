@@ -111,6 +111,13 @@ impl Component<GameState> for WorldComponent {
                 self.display.set_color(sx, sy, color);
             }
         }
+        
+        // draw foods
+        for food in shared_state.custom.foods.values() {
+            let (screen_x, screen_y) = shared_state.custom.world.to_screen_pos(food.x.floor() as i64, food.y.floor() as i64);
+            let color = Color::Rgb([food.color.r, food.color.g, food.color.b]);
+            self.display.set_color(screen_x as usize, screen_y as usize, color);
+        }
 
         for ball in shared_state.custom.balls.values() {
             if ball.dead {

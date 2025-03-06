@@ -7,12 +7,17 @@ use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 pub mod apply_impulse_reducer;
 pub mod ball_type;
 pub mod balls_table;
+pub mod food_type;
+pub mod foods_table;
 pub mod identity_connected_reducer;
 pub mod identity_disconnected_reducer;
 pub mod respawn_ball_reducer;
 pub mod respawn_balls_schedule_table;
 pub mod respawn_balls_schedule_type;
 pub mod rgb_type;
+pub mod spawn_food_reducer;
+pub mod spawn_food_schedule_type;
+pub mod spawn_foods_schedule_table;
 pub mod update_balls_reducer;
 pub mod update_balls_schedule_table;
 pub mod update_balls_schedule_type;
@@ -22,6 +27,8 @@ pub use apply_impulse_reducer::{
 };
 pub use ball_type::Ball;
 pub use balls_table::*;
+pub use food_type::Food;
+pub use foods_table::*;
 pub use identity_connected_reducer::{
     identity_connected, set_flags_for_identity_connected, IdentityConnectedCallbackId,
 };
@@ -32,6 +39,9 @@ pub use respawn_ball_reducer::{respawn_ball, set_flags_for_respawn_ball, Respawn
 pub use respawn_balls_schedule_table::*;
 pub use respawn_balls_schedule_type::RespawnBallsSchedule;
 pub use rgb_type::Rgb;
+pub use spawn_food_reducer::{set_flags_for_spawn_food, spawn_food, SpawnFoodCallbackId};
+pub use spawn_food_schedule_type::SpawnFoodSchedule;
+pub use spawn_foods_schedule_table::*;
 pub use update_balls_reducer::{set_flags_for_update_balls, update_balls, UpdateBallsCallbackId};
 pub use update_balls_schedule_table::*;
 pub use update_balls_schedule_type::UpdateBallsSchedule;
@@ -48,6 +58,7 @@ pub enum Reducer {
     IdentityConnected,
     IdentityDisconnected,
     RespawnBall { schedule: RespawnBallsSchedule },
+    SpawnFood { schedule: SpawnFoodSchedule },
     UpdateBalls { schedule: UpdateBallsSchedule },
 }
 
@@ -62,6 +73,7 @@ impl __sdk::Reducer for Reducer {
             Reducer::IdentityConnected => "identity_connected",
             Reducer::IdentityDisconnected => "identity_disconnected",
             Reducer::RespawnBall { .. } => "respawn_ball",
+            Reducer::SpawnFood { .. } => "spawn_food",
             Reducer::UpdateBalls { .. } => "update_balls",
         }
     }
@@ -89,6 +101,13 @@ impl TryFrom<__ws::ReducerCallInfo<__ws::BsatnFormat>> for Reducer {
                 )?
                 .into(),
             ),
+            "spawn_food" => Ok(
+                __sdk::parse_reducer_args::<spawn_food_reducer::SpawnFoodArgs>(
+                    "spawn_food",
+                    &value.args,
+                )?
+                .into(),
+            ),
             "update_balls" => Ok(
                 __sdk::parse_reducer_args::<update_balls_reducer::UpdateBallsArgs>(
                     "update_balls",
@@ -111,7 +130,9 @@ impl TryFrom<__ws::ReducerCallInfo<__ws::BsatnFormat>> for Reducer {
 #[doc(hidden)]
 pub struct DbUpdate {
     balls: __sdk::TableUpdate<Ball>,
+    foods: __sdk::TableUpdate<Food>,
     respawn_balls_schedule: __sdk::TableUpdate<RespawnBallsSchedule>,
+    spawn_foods_schedule: __sdk::TableUpdate<SpawnFoodSchedule>,
     update_balls_schedule: __sdk::TableUpdate<UpdateBallsSchedule>,
 }
 
@@ -122,9 +143,14 @@ impl TryFrom<__ws::DatabaseUpdate<__ws::BsatnFormat>> for DbUpdate {
         for table_update in raw.tables {
             match &table_update.table_name[..] {
                 "balls" => db_update.balls = balls_table::parse_table_update(table_update)?,
+                "foods" => db_update.foods = foods_table::parse_table_update(table_update)?,
                 "respawn_balls_schedule" => {
                     db_update.respawn_balls_schedule =
                         respawn_balls_schedule_table::parse_table_update(table_update)?
+                }
+                "spawn_foods_schedule" => {
+                    db_update.spawn_foods_schedule =
+                        spawn_foods_schedule_table::parse_table_update(table_update)?
                 }
                 "update_balls_schedule" => {
                     db_update.update_balls_schedule =
@@ -159,10 +185,19 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.balls = cache
             .apply_diff_to_table::<Ball>("balls", &self.balls)
             .with_updates_by_pk(|row| &row.identity);
+        diff.foods = cache
+            .apply_diff_to_table::<Food>("foods", &self.foods)
+            .with_updates_by_pk(|row| &row.id);
         diff.respawn_balls_schedule = cache
             .apply_diff_to_table::<RespawnBallsSchedule>(
                 "respawn_balls_schedule",
                 &self.respawn_balls_schedule,
+            )
+            .with_updates_by_pk(|row| &row.scheduled_id);
+        diff.spawn_foods_schedule = cache
+            .apply_diff_to_table::<SpawnFoodSchedule>(
+                "spawn_foods_schedule",
+                &self.spawn_foods_schedule,
             )
             .with_updates_by_pk(|row| &row.scheduled_id);
         diff.update_balls_schedule = cache
@@ -181,7 +216,9 @@ impl __sdk::DbUpdate for DbUpdate {
 #[doc(hidden)]
 pub struct AppliedDiff<'r> {
     balls: __sdk::TableAppliedDiff<'r, Ball>,
+    foods: __sdk::TableAppliedDiff<'r, Food>,
     respawn_balls_schedule: __sdk::TableAppliedDiff<'r, RespawnBallsSchedule>,
+    spawn_foods_schedule: __sdk::TableAppliedDiff<'r, SpawnFoodSchedule>,
     update_balls_schedule: __sdk::TableAppliedDiff<'r, UpdateBallsSchedule>,
 }
 
@@ -196,9 +233,15 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
         callbacks: &mut __sdk::DbCallbacks<RemoteModule>,
     ) {
         callbacks.invoke_table_row_callbacks::<Ball>("balls", &self.balls, event);
+        callbacks.invoke_table_row_callbacks::<Food>("foods", &self.foods, event);
         callbacks.invoke_table_row_callbacks::<RespawnBallsSchedule>(
             "respawn_balls_schedule",
             &self.respawn_balls_schedule,
+            event,
+        );
+        callbacks.invoke_table_row_callbacks::<SpawnFoodSchedule>(
+            "spawn_foods_schedule",
+            &self.spawn_foods_schedule,
             event,
         );
         callbacks.invoke_table_row_callbacks::<UpdateBallsSchedule>(
@@ -782,7 +825,9 @@ impl __sdk::SpacetimeModule for RemoteModule {
 
     fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         balls_table::register_table(client_cache);
+        foods_table::register_table(client_cache);
         respawn_balls_schedule_table::register_table(client_cache);
+        spawn_foods_schedule_table::register_table(client_cache);
         update_balls_schedule_table::register_table(client_cache);
     }
 }

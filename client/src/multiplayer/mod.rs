@@ -6,6 +6,7 @@ use module_bindings::*;
 use spacetimedb_sdk::{credentials, DbContext, Error, Event, Identity, ScheduleAt, Status, Table, TableWithPrimaryKey, TimeDuration};
 
 pub use module_bindings::Ball;
+pub use module_bindings::Food;
 
 
 
@@ -17,6 +18,9 @@ pub enum ReceiveMessage {
     UpdateBall(Ball, Ball),
     DeleteBall(Identity),
     OurIdentity(Identity),
+    NewFood(Food),
+    UpdateFood(Food),
+    DeleteFood(u64),
 }
 
 pub enum SendMessage {
@@ -31,8 +35,6 @@ pub enum SendMessage {
 pub fn connect_to(url: String) -> anyhow::Result<(Receiver<ReceiveMessage>, Sender<SendMessage>)> {
     let (receive_tx, receive_rx) = std::sync::mpsc::channel();
     let (send_tx, send_rx) = std::sync::mpsc::channel();
-
-
 
     std::thread::spawn(move || {
         multiplayer_loop(url, receive_tx, send_rx);
@@ -96,6 +98,7 @@ fn connect_to_db(url: String) -> DbConnection {
 
 /// Register all the callbacks our app will use to respond to database events.
 fn register_callbacks(ctx: &DbConnection, tx: Sender<ReceiveMessage>) {
+    // balls
     {
         let tx = tx.clone();
         ctx.db.balls().on_insert(move |ctx, ball| {
@@ -116,14 +119,34 @@ fn register_callbacks(ctx: &DbConnection, tx: Sender<ReceiveMessage>) {
             tx.send(ReceiveMessage::DeleteBall(ball.identity)).unwrap();
         });
     }
+    
+    // foods
+    {
+        let tx = tx.clone();
+        ctx.db.foods().on_insert(move |ctx, food| {
+            tx.send(ReceiveMessage::NewFood(food.clone())).unwrap();
+        });
+    }
 
-    // TODO: callbacks for reducers
+    {
+        let tx = tx.clone();
+        ctx.db.foods().on_update(move |ctx, old_food, new_food| {
+            tx.send(ReceiveMessage::UpdateFood(new_food.clone())).unwrap();
+        });
+    }
+
+    {
+        let tx = tx.clone();
+        ctx.db.foods().on_delete(move |ctx, food| {
+            tx.send(ReceiveMessage::DeleteFood(food.id)).unwrap();
+        });
+    }
 }
 
 /// Register subscriptions for all rows of both tables.
 fn subscribe_to_tables(ctx: &DbConnection) {
     ctx.subscription_builder()
-        .subscribe(["SELECT * FROM balls"]);
+        .subscribe(["SELECT * FROM balls", "SELECT * FROM foods"]);
 }
 
 fn creds_store() -> credentials::File {
