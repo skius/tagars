@@ -193,8 +193,9 @@ impl Component<GameState> for GameComponent {
         let diff_x = x - center_x;
         let diff_y = y - center_y;
         let diff_y = -2*diff_y; // pixel ratio of 2, upside down
-        
-        if shared_state.pressed_keys.did_press_char(' ') {
+
+        // if shared_state.pressed_keys.did_press_char(' ') {
+        if shared_state.mouse_info.right_mouse_down {
             let message = SendMessage::Impulse(diff_x as f64, diff_y as f64);
             shared_state.custom.sender().send(message).unwrap();
         }
