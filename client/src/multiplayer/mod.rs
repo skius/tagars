@@ -10,10 +10,12 @@ pub use module_bindings::Ball;
 
 
 
+#[derive(Debug)]
 pub enum ReceiveMessage {
     NewBall(Ball),
     UpdateBall(Ball),
     DeleteBall(Identity),
+    OurIdentity(Identity),
 }
 
 pub enum SendMessage {
@@ -49,6 +51,11 @@ fn multiplayer_loop(url: String, receive_tx: Sender<ReceiveMessage>, send_rx: Re
 
     // Spawn a thread, where the connection will process messages and invoke callbacks.
     ctx.run_threaded();
+
+    while ctx.try_identity().is_none() {
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    receive_tx.send(ReceiveMessage::OurIdentity(ctx.identity())).unwrap();
 
     // Handle input
     loop {

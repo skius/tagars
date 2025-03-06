@@ -96,7 +96,7 @@ impl Component<GameState> for SlingshotComponent {
         if let Some((s_x, s_y)) = self.slingshot {
             const AMPLIFIER: f64 = 0.1;
             let impulse_x = s_x as f64 * AMPLIFIER;
-            let impulse_y = -s_y as f64 * AMPLIFIER * 2.0;
+            let impulse_y = s_y as f64 * AMPLIFIER * 2.0;
 
             game_state.sender().send(multiplayer::SendMessage::Impulse(impulse_x, impulse_y)).unwrap();
 

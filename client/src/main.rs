@@ -18,10 +18,13 @@ use teng::components::debuginfo::{DebugInfoComponent, DebugMessage};
 use teng::rendering::color::Color;
 use teng::rendering::render::{HalfBlockDisplayRender, Render};
 use teng::util::for_coord_in_line;
-use crate::multiplayer::Ball;
+use crate::multiplayer::{Ball, ReceiveMessage};
+use crate::slingshot::SlingshotComponent;
+use crate::world::{World, WorldComponent};
 
 mod multiplayer;
 mod slingshot;
+mod world;
 
 fn main() -> anyhow::Result<()> {
     terminal_setup()?;
@@ -32,7 +35,8 @@ fn main() -> anyhow::Result<()> {
     let mut game = Game::new_with_custom_buf_writer();
     game.install_recommended_components();
     game.add_component(Box::new(GameComponent::new(receive_rx, send_tx)));
-    game.add_component(Box::new(slingshot::SlingshotComponent::new()));
+    game.add_component(Box::new(SlingshotComponent::new()));
+    game.add_component(Box::new(WorldComponent::new()));
     game.add_component(Box::new(DebugInfoComponent::new()));
     game.run()?;
 
@@ -43,16 +47,18 @@ fn main() -> anyhow::Result<()> {
 
 #[derive(Debug, Default)]
 struct GameState {
+    world: World,
     balls: HashMap<Identity, Ball>,
     receive_rx: Option<Receiver<multiplayer::ReceiveMessage>>,
     send_tx: Option<Sender<multiplayer::SendMessage>>,
+    our_identity: Option<Identity>,
 }
 
 impl GameState {
     fn sender(&self) -> &Sender<multiplayer::SendMessage> {
         self.send_tx.as_ref().unwrap()
     }
-    
+
     fn receiver(&self) -> &Receiver<multiplayer::ReceiveMessage> {
         self.receive_rx.as_ref().unwrap()
     }
@@ -67,7 +73,7 @@ struct GameComponent {
 }
 
 impl GameComponent {
-    fn new(receive_rx: std::sync::mpsc::Receiver<multiplayer::ReceiveMessage>, send_tx: std::sync::mpsc::Sender<multiplayer::SendMessage>) -> Self {
+    fn new(receive_rx: Receiver<multiplayer::ReceiveMessage>, send_tx: Sender<multiplayer::SendMessage>) -> Self {
         Self {
             receive_rx: Some(receive_rx),
             send_tx: Some(send_tx),
@@ -86,6 +92,9 @@ impl GameComponent {
                 }
                 multiplayer::ReceiveMessage::DeleteBall(identity) => {
                     game_state.balls.remove(&identity);
+                }
+                ReceiveMessage::OurIdentity(identity) => {
+                    game_state.our_identity = Some(identity);
                 }
             }
         }
@@ -109,29 +118,29 @@ impl Component<GameState> for GameComponent {
         self.apply_messages(&mut shared_state.custom);
 
 
-        // render to half block display
-        self.display.clear();
-        for ball in shared_state.custom.balls.values() {
-            let x = ball.x as i64;
-            let y = ball.y as i64;
-            let radius = ball.radius as i64;
-            for_coord_in_line(false, (x - radius, 0), (x + radius, 0), |x, _| {
-                for_coord_in_line(false, (0, y - radius), (0, y + radius), |_, y| {
-                    if (x - ball.x as i64).pow(2) + (y - ball.y as i64).pow(2) <= radius.pow(2) {
-                        if x < 0 || y < 0 {
-                            return;
-                        }
-                        let rgb = [ball.color.r, ball.color.g, ball.color.b];
-                        self.display.set_color(x as usize, y as usize, Color::Rgb(rgb));
-                    }
-                });
-            });
-        }
+        // // render to half block display
+        // self.display.clear();
+        // for ball in shared_state.custom.balls.values() {
+        //     let x = ball.x as i64;
+        //     let y = ball.y as i64;
+        //     let radius = ball.radius as i64;
+        //     for_coord_in_line(false, (x - radius, 0), (x + radius, 0), |x, _| {
+        //         for_coord_in_line(false, (0, y - radius), (0, y + radius), |_, y| {
+        //             if (x - ball.x as i64).pow(2) + (y - ball.y as i64).pow(2) <= radius.pow(2) {
+        //                 if x < 0 || y < 0 {
+        //                     return;
+        //                 }
+        //                 let rgb = [ball.color.r, ball.color.g, ball.color.b];
+        //                 self.display.set_color(x as usize, y as usize, Color::Rgb(rgb));
+        //             }
+        //         });
+        //     });
+        // }
 
         shared_state.debug_info.custom.insert("balls_length".to_string(), format!("balls: {}", shared_state.custom.balls.len()));
     }
 
     fn render(&self, renderer: &mut dyn Renderer, shared_state: &SharedState<GameState>, depth_base: i32) {
-        self.display.render(renderer, 0, 0, depth_base);
+        // self.display.render(renderer, 0, 0, depth_base);
     }
 }
