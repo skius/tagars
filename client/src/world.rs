@@ -25,7 +25,7 @@ impl World {
     const WORLD_BORDER_MIN_Y: i64 = -200;
     const WORLD_BORDER_MAX_Y: i64 = 200;
 
-    pub fn to_screen_pos(&self, world_x: i64, world_y: i64) -> Option<(usize, usize)> {
+    pub fn to_screen_pos(&self, world_x: i64, world_y: i64) -> (i64, i64) {
         let camera_x = self.camera_attach.0;
         let camera_y = self.camera_attach.1;
 
@@ -33,18 +33,11 @@ impl World {
         let camera_x = camera_x - (self.screen_width as i64) / 2;
         let camera_y = camera_y + (self.screen_height as i64) / 2;
 
-        // TODO: does this make sense for coords to the left/up of camera?
         let screen_x = world_x - camera_x;
         let screen_y = camera_y - world_y;
 
-        if screen_x < 0 || screen_y < 0 {
-            return None;
-        }
-        if screen_x >= self.screen_width as i64 || screen_y >= self.screen_height as i64 {
-            return None;
-        }
 
-        Some((screen_x as usize, screen_y as usize))
+        (screen_x, screen_y)
     }
 
     pub fn to_world_pos(&self, screen_x: i64, screen_y: i64) -> (i64, i64) {
@@ -64,12 +57,14 @@ impl World {
 
 pub struct WorldComponent {
     display: HalfBlockDisplayRender,
+    checkerboard_display: HalfBlockDisplayRender,
 }
 
 impl WorldComponent {
     pub fn new() -> Self {
         Self {
             display: HalfBlockDisplayRender::new(0, 0),
+            checkerboard_display: HalfBlockDisplayRender::new(0, 0),
         }
     }
 }
@@ -83,6 +78,7 @@ impl Component<GameState> for WorldComponent {
         shared_state.custom.world.screen_width = width;
         shared_state.custom.world.screen_height = 2 * height;
         self.display.resize_discard(width, 2 * height);
+        self.checkerboard_display.resize_discard(width, 2 * height);
     }
 
     fn update(&mut self, update_info: UpdateInfo, shared_state: &mut SharedState<GameState>) {
@@ -93,26 +89,35 @@ impl Component<GameState> for WorldComponent {
 
         // render to half block display
         self.display.clear();
+        // self.checkerboard_display.clear();
         // first render checkerboard pattern (so that balls can overwrite it)
-        // let checkerboard_width = 5;
-        // let checkerboard_color_a = Color::Rgb([50, 50, 50]);
-        // let checkerboard_color_b = Color::Rgb([100, 100, 100]);
-        // for x in 0..shared_state.custom.world.screen_width {
-        //     for y in 0..shared_state.custom.world.screen_height {
-        //         if (x / checkerboard_width + y / checkerboard_width) % 2 == 0 {
-        //             self.display.set_color(x, y, checkerboard_color_a);
-        //         } else {
-        //             self.display.set_color(x, y, checkerboard_color_b);
-        //         }
-        //     }
-        // }
+        let checkerboard_width = 20;
+        let checkerboard_color_a = Color::Rgb([50, 50, 50]);
+        let checkerboard_color_b = Color::Rgb([100, 100, 100]);
+        for sx in 0..shared_state.custom.world.screen_width {
+            for sy in 0..shared_state.custom.world.screen_height {
+                let (x, y) = (sx as i64, sy as i64);
+                let (x, y) = shared_state.custom.world.to_world_pos(x, y);
+                if x < World::WORLD_BORDER_MIN_X || x >= World::WORLD_BORDER_MAX_X || y < World::WORLD_BORDER_MIN_Y || y >= World::WORLD_BORDER_MAX_Y {
+                    continue;
+                }
+                let scaled_x = (x as f64 / checkerboard_width as f64).floor() as i64;
+                let scaled_y = (y as f64 / checkerboard_width as f64).floor() as i64;
+                let color = if (scaled_x + scaled_y) % 2 == 0 {
+                    checkerboard_color_a
+                } else {
+                    checkerboard_color_b
+                };
+                self.display.set_color(sx, sy, color);
+            }
+        }
 
         for ball in shared_state.custom.balls.values() {
-            let (screen_x, screen_y) = shared_state.custom.world.to_screen_pos(ball.x.floor() as i64, ball.y.floor() as i64).unwrap();
+            let (screen_x, screen_y) = shared_state.custom.world.to_screen_pos(ball.x.floor() as i64, ball.y.floor() as i64);
             let radius = ball.radius as i64;
-            for_coord_in_line(false, (screen_x as i64 - radius, 0), (screen_x as i64 + radius, 0), |x, _| {
-                for_coord_in_line(false, (0, screen_y as i64 - radius), (0, screen_y as i64 + radius), |_, y| {
-                    if (x - screen_x as i64).pow(2) + (y - screen_y as i64).pow(2) <= radius.pow(2) {
+            for_coord_in_line(false, (screen_x - radius, 0), (screen_x + radius, 0), |x, _| {
+                for_coord_in_line(false, (0, screen_y - radius), (0, screen_y + radius), |_, y| {
+                    if (x - screen_x).pow(2) + (y - screen_y).pow(2) <= radius.pow(2) {
                         if x < 0 || y < 0 {
                             return;
                         }
@@ -128,26 +133,28 @@ impl Component<GameState> for WorldComponent {
         let checkerboard_pattern_depth = depth_base;
         let coord_depth = checkerboard_pattern_depth + 1;
         let balls_depth = coord_depth + 1;
+        let balls_depth = coord_depth - 1;
         self.display.render(renderer, 0, 0, balls_depth);
+        // self.checkerboard_display.render(renderer, 0, 0, checkerboard_pattern_depth);
 
         // render checkerboard
-        let checkerboard_scale = 20.0;
-        for sy in 0..shared_state.display_info.height() {
-            for sx in 0..shared_state.display_info.width() {
-                let (x, y) = (sx as i64, sy as i64);
-                let (x, y) = shared_state.custom.world.to_world_pos(x, 2 * y);
-                let color = if ((x as f64 / checkerboard_scale).floor() as i64 + (y as f64 / checkerboard_scale).floor() as i64) % 2 == 0 {
-                    [10; 3]
-                } else {
-                    [20; 3]
-                };
-                // check that we're inside world border still
-                if x < World::WORLD_BORDER_MIN_X || x > World::WORLD_BORDER_MAX_X || y < World::WORLD_BORDER_MIN_Y || y > World::WORLD_BORDER_MAX_Y {
-                    continue;
-                }
-                renderer.render_pixel(sx, sy, Pixel::transparent().with_bg_color(color), checkerboard_pattern_depth);
-            }
-        }
+        // let checkerboard_scale = 20.0;
+        // for sy in 0..shared_state.display_info.height() {
+        //     for sx in 0..shared_state.display_info.width() {
+        //         let (x, y) = (sx as i64, sy as i64);
+        //         let (x, y) = shared_state.custom.world.to_world_pos(x, 2 * y);
+        //         let color = if ((x as f64 / checkerboard_scale).floor() as i64 + (y as f64 / checkerboard_scale).floor() as i64) % 2 == 0 {
+        //             [10; 3]
+        //         } else {
+        //             [20; 3]
+        //         };
+        //         // check that we're inside world border still
+        //         if x < World::WORLD_BORDER_MIN_X || x > World::WORLD_BORDER_MAX_X || y < World::WORLD_BORDER_MIN_Y || y > World::WORLD_BORDER_MAX_Y {
+        //             continue;
+        //         }
+        //         renderer.render_pixel(sx, sy, Pixel::transparent().with_bg_color(color), checkerboard_pattern_depth);
+        //     }
+        // }
 
         let world = &shared_state.custom.world;
 

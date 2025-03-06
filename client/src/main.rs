@@ -35,8 +35,8 @@ fn main() -> anyhow::Result<()> {
     let mut game = Game::new_with_custom_buf_writer();
     game.install_recommended_components();
     game.add_component(Box::new(GameComponent::new(receive_rx, send_tx)));
-    game.add_component(Box::new(SlingshotComponent::new()));
     game.add_component(Box::new(WorldComponent::new()));
+    game.add_component(Box::new(SlingshotComponent::new()));
     game.add_component(Box::new(DebugInfoComponent::new()));
     game.run()?;
 
