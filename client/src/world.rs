@@ -91,7 +91,7 @@ impl Component<GameState> for WorldComponent {
         self.display.clear();
         // self.checkerboard_display.clear();
         // first render checkerboard pattern (so that balls can overwrite it)
-        let checkerboard_width = 20;
+        let checkerboard_width = 40;
         let checkerboard_color_a = Color::Rgb([50, 50, 50]);
         let checkerboard_color_b = Color::Rgb([100, 100, 100]);
         for sx in 0..shared_state.custom.world.screen_width {
@@ -136,25 +136,6 @@ impl Component<GameState> for WorldComponent {
         let balls_depth = coord_depth - 1;
         self.display.render(renderer, 0, 0, balls_depth);
         // self.checkerboard_display.render(renderer, 0, 0, checkerboard_pattern_depth);
-
-        // render checkerboard
-        // let checkerboard_scale = 20.0;
-        // for sy in 0..shared_state.display_info.height() {
-        //     for sx in 0..shared_state.display_info.width() {
-        //         let (x, y) = (sx as i64, sy as i64);
-        //         let (x, y) = shared_state.custom.world.to_world_pos(x, 2 * y);
-        //         let color = if ((x as f64 / checkerboard_scale).floor() as i64 + (y as f64 / checkerboard_scale).floor() as i64) % 2 == 0 {
-        //             [10; 3]
-        //         } else {
-        //             [20; 3]
-        //         };
-        //         // check that we're inside world border still
-        //         if x < World::WORLD_BORDER_MIN_X || x > World::WORLD_BORDER_MAX_X || y < World::WORLD_BORDER_MIN_Y || y > World::WORLD_BORDER_MAX_Y {
-        //             continue;
-        //         }
-        //         renderer.render_pixel(sx, sy, Pixel::transparent().with_bg_color(color), checkerboard_pattern_depth);
-        //     }
-        // }
 
         let world = &shared_state.custom.world;
 

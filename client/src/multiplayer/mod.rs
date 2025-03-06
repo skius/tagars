@@ -13,7 +13,8 @@ pub use module_bindings::Ball;
 #[derive(Debug)]
 pub enum ReceiveMessage {
     NewBall(Ball),
-    UpdateBall(Ball),
+    // old and new
+    UpdateBall(Ball, Ball),
     DeleteBall(Identity),
     OurIdentity(Identity),
 }
@@ -105,7 +106,7 @@ fn register_callbacks(ctx: &DbConnection, tx: Sender<ReceiveMessage>) {
     {
         let tx = tx.clone();
         ctx.db.balls().on_update(move |ctx, old_ball, new_ball| {
-            tx.send(ReceiveMessage::UpdateBall(new_ball.clone())).unwrap();
+            tx.send(ReceiveMessage::UpdateBall(old_ball.clone(), new_ball.clone())).unwrap();
         });
     }
 

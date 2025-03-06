@@ -141,13 +141,14 @@ fn apply_impulse(ctx: &ReducerContext, impulse_x: f64, impulse_y: f64) {
 
 
 #[spacetimedb::reducer(init)]
-pub fn init(_ctx: &ReducerContext) {
+pub fn init(ctx: &ReducerContext) {
     // Add scheduler for update_balls
     let schedule = UpdateBallsSchedule {
         scheduled_id: 0,
         scheduled_at: TimeDuration::from_micros(16_666).into(),
+        // scheduled_at: TimeDuration::from_micros(200_000).into(),
     };
-    _ctx.db.update_balls_schedule().insert(schedule);
+    ctx.db.update_balls_schedule().insert(schedule);
 }
 
 #[spacetimedb::reducer(client_connected)]
