@@ -35,9 +35,47 @@ impl Ball {
     pub const WORLD_BORDER_MAX_X: f64 = 200.0;
     pub const WORLD_BORDER_MIN_Y: f64 = -200.0;
     pub const WORLD_BORDER_MAX_Y: f64 = 200.0;
-    
+
     pub fn mass(&self) -> f64 {
         self.radius * self.radius * std::f64::consts::PI
+    }
+
+    // returns whether there has been an update or not
+    pub fn handle_collision(&mut self, other: &mut Ball) -> bool {
+        let mut did_update = false;
+        
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        let distance = (dx*dx + dy*dy).sqrt();
+        let overlap = self.radius + other.radius - distance;
+        if overlap > 0.0 {
+            let overlap = overlap / 2.0;
+            let dx = dx / distance * overlap;
+            let dy = dy / distance * overlap;
+            self.x += dx;
+            self.y += dy;
+            other.x -= dx;
+            other.y -= dy;
+            // also update velocities, but take into account the mass of each ball
+            let self_mass = self.mass();
+            let other_mass = other.mass();
+            let normal_x = dx / overlap;
+            let normal_y = dy / overlap;
+            let relative_velocity_x = self.vx - other.vx;
+            let relative_velocity_y = self.vy - other.vy;
+            let dot_product = relative_velocity_x * normal_x + relative_velocity_y * normal_y;
+            // if dot_product < 0.0 {
+            let impulse = 2.0 * dot_product / (self_mass + other_mass);
+            self.vx -= impulse * normal_x * other_mass;
+            // self.vx -= 5.0;
+            self.vy -= impulse * normal_y * other_mass;
+            other.vx += impulse * normal_x * self_mass;
+            other.vy += impulse * normal_y * self_mass;
+            
+            did_update = true;
+        }
+        
+        did_update
     }
 }
 
@@ -50,6 +88,8 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
         log::warn!("Unauthorized attempt to update balls from identity {}", ctx.sender);
         return;
     }
+    
+    // let balls = ctx.db.balls().iter().collect::<Vec<_>>();
 
     // Update positions individually
     for mut ball in ctx.db.balls().iter() {
@@ -61,7 +101,7 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
 
         ctx.db.balls().identity().update(ball);
     }
-    
+
     // Update wall collisions with WORLD_BORDER
     for mut ball in ctx.db.balls().iter() {
         if ball.x - ball.radius < Ball::WORLD_BORDER_MIN_X {
@@ -90,38 +130,9 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
                 continue;
             }
 
-            let dx = ball1.x - ball2.x;
-            let dy = ball1.y - ball2.y;
-            let distance = (dx*dx + dy*dy).sqrt();
-            let overlap = ball1.radius + ball2.radius - distance;
-            if overlap > 0.0 {
-                let overlap = overlap / 2.0;
-                let dx = dx / distance * overlap;
-                let dy = dy / distance * overlap;
-                ball1.x += dx;
-                ball1.y += dy;
-                ball2.x -= dx;
-                ball2.y -= dy;
-                // also update velocities, but take into account the mass of each ball
-                let ball1_mass = ball1.mass();
-                let ball2_mass = ball2.mass();
-                let normal_x = dx / overlap;
-                let normal_y = dy / overlap;
-                let relative_velocity_x = ball1.vx - ball2.vx;
-                let relative_velocity_y = ball1.vy - ball2.vy;
-                let dot_product = relative_velocity_x * normal_x + relative_velocity_y * normal_y;
-                if dot_product < 0.0 {
-                    let impulse = 2.0 * dot_product / (ball1_mass + ball2_mass);
-                    ball1.vx -= impulse * normal_x * ball2_mass;
-                    ball1.vy -= impulse * normal_y * ball2_mass;
-                    ball2.vx += impulse * normal_x * ball1_mass;
-                    ball2.vy += impulse * normal_y * ball1_mass;
-
-                    ctx.db.balls().identity().update(ball1.clone());
-                    ctx.db.balls().identity().update(ball2);
-
-                }
-
+            if ball1.handle_collision(&mut ball2) {
+                ctx.db.balls().identity().update(ball1.clone());
+                ctx.db.balls().identity().update(ball2);
             }
         }
 
