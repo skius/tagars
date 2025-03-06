@@ -43,7 +43,7 @@ impl Ball {
     // returns whether there has been an update or not
     pub fn handle_collision(&mut self, other: &mut Ball) -> bool {
         let mut did_update = false;
-        
+
         let dx = self.x - other.x;
         let dy = self.y - other.y;
         let distance = (dx*dx + dy*dy).sqrt();
@@ -71,10 +71,10 @@ impl Ball {
             self.vy -= impulse * normal_y * other_mass;
             other.vx += impulse * normal_x * self_mass;
             other.vy += impulse * normal_y * self_mass;
-            
+
             did_update = true;
         }
-        
+
         did_update
     }
 }
@@ -88,22 +88,20 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
         log::warn!("Unauthorized attempt to update balls from identity {}", ctx.sender);
         return;
     }
-    
-    // let balls = ctx.db.balls().iter().collect::<Vec<_>>();
+
+    let mut balls = ctx.db.balls().iter().collect::<Vec<_>>();
 
     // Update positions individually
-    for mut ball in ctx.db.balls().iter() {
+    for ball in &mut balls {
         ball.vx *= DRAG;
         ball.vy *= DRAG;
 
         ball.x += ball.vx;
         ball.y += ball.vy;
-
-        ctx.db.balls().identity().update(ball);
     }
 
     // Update wall collisions with WORLD_BORDER
-    for mut ball in ctx.db.balls().iter() {
+    for ball in &mut balls {
         if ball.x - ball.radius < Ball::WORLD_BORDER_MIN_X {
             ball.x = Ball::WORLD_BORDER_MIN_X + ball.radius;
             ball.vx = -ball.vx;
@@ -120,25 +118,23 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
             ball.y = Ball::WORLD_BORDER_MAX_Y - ball.radius;
             ball.vy = -ball.vy;
         }
-        ctx.db.balls().identity().update(ball);
     }
 
     // Update collisions
-    for mut ball1 in ctx.db.balls().iter() {
-        for mut ball2 in ctx.db.balls().iter() {
-            if ball1.identity == ball2.identity {
-                continue;
-            }
+    for ball1_idx in 0..balls.len() {
+        for ball2_idx in ball1_idx+1..balls.len() {
+            let (balls1, balls2) = balls.split_at_mut(ball2_idx);
+            let ball1 = &mut balls1[ball1_idx];
+            let ball2 = &mut balls2[0];
 
-            if ball1.handle_collision(&mut ball2) {
-                ctx.db.balls().identity().update(ball1.clone());
-                ctx.db.balls().identity().update(ball2);
-            }
+            ball1.handle_collision(ball2);
         }
 
     }
 
-    // log::info!("Updated balls");
+    for ball in balls {
+        ctx.db.balls().identity().update(ball.clone());
+    }
 }
 
 /// Applies an impulse to the sender's ball
