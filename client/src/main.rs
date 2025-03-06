@@ -121,7 +121,8 @@ impl Component<GameState> for GameComponent {
                         if x < 0 || y < 0 {
                             return;
                         }
-                        self.display.set_color(x as usize, y as usize, Color::Rgb([255; 3]));
+                        let rgb = [ball.color.r, ball.color.g, ball.color.b];
+                        self.display.set_color(x as usize, y as usize, Color::Rgb(rgb));
                     }
                 });
             });

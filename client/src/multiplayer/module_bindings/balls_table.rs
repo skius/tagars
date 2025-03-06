@@ -3,6 +3,7 @@
 
 #![allow(unused, clippy::all)]
 use super::ball_type::Ball;
+use super::rgb_type::Rgb;
 use spacetimedb_sdk::__codegen::{self as __sdk, __lib, __sats, __ws};
 
 /// Table handle for the table `balls`.

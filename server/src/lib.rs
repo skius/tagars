@@ -1,4 +1,4 @@
-use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table, TimeDuration};
+use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, TimeDuration};
 
 
 #[spacetimedb::table(name = update_balls_schedule, scheduled(update_balls))]
@@ -8,6 +8,13 @@ struct UpdateBallsSchedule {
     scheduled_id: u64,
 
     scheduled_at: ScheduleAt,
+}
+
+#[derive(SpacetimeType, Clone, Copy)]
+pub struct Rgb {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
 }
 
 #[derive(Clone)]
@@ -20,9 +27,15 @@ pub struct Ball {
     pub vx: f64,
     pub vy: f64,
     pub radius: f64,
+    pub color: Rgb,
 }
 
 impl Ball {
+    pub const WORLD_BORDER_MIN_X: f64 = -200.0;
+    pub const WORLD_BORDER_MAX_X: f64 = 200.0;
+    pub const WORLD_BORDER_MIN_Y: f64 = -200.0;
+    pub const WORLD_BORDER_MAX_Y: f64 = 200.0;
+    
     pub fn mass(&self) -> f64 {
         self.radius * self.radius * std::f64::consts::PI
     }
@@ -48,48 +61,70 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
 
         ctx.db.balls().identity().update(ball);
     }
+    
+    // Update wall collisions with WORLD_BORDER
+    for mut ball in ctx.db.balls().iter() {
+        if ball.x - ball.radius < Ball::WORLD_BORDER_MIN_X {
+            ball.x = Ball::WORLD_BORDER_MIN_X + ball.radius;
+            ball.vx = -ball.vx;
+        }
+        if ball.x + ball.radius > Ball::WORLD_BORDER_MAX_X {
+            ball.x = Ball::WORLD_BORDER_MAX_X - ball.radius;
+            ball.vx = -ball.vx;
+        }
+        if ball.y - ball.radius < Ball::WORLD_BORDER_MIN_Y {
+            ball.y = Ball::WORLD_BORDER_MIN_Y + ball.radius;
+            ball.vy = -ball.vy;
+        }
+        if ball.y + ball.radius > Ball::WORLD_BORDER_MAX_Y {
+            ball.y = Ball::WORLD_BORDER_MAX_Y - ball.radius;
+            ball.vy = -ball.vy;
+        }
+        ctx.db.balls().identity().update(ball);
+    }
 
     // Update collisions
-    for mut ball in ctx.db.balls().iter() {
-        let mut did_change = false;
-        for mut other in ctx.db.balls().iter() {
-            let mut ball = ball.clone();
-            if ball.identity == other.identity {
+    for mut ball1 in ctx.db.balls().iter() {
+        for mut ball2 in ctx.db.balls().iter() {
+            if ball1.identity == ball2.identity {
                 continue;
             }
 
-            let dx = ball.x - other.x;
-            let dy = ball.y - other.y;
-            let distance = (dx * dx + dy * dy).sqrt();
-            let min_distance = ball.radius + other.radius;
+            let dx = ball1.x - ball2.x;
+            let dy = ball1.y - ball2.y;
+            let distance = (dx*dx + dy*dy).sqrt();
+            let overlap = ball1.radius + ball2.radius - distance;
+            if overlap > 0.0 {
+                let overlap = overlap / 2.0;
+                let dx = dx / distance * overlap;
+                let dy = dy / distance * overlap;
+                ball1.x += dx;
+                ball1.y += dy;
+                ball2.x -= dx;
+                ball2.y -= dy;
+                // also update velocities, but take into account the mass of each ball
+                let ball1_mass = ball1.mass();
+                let ball2_mass = ball2.mass();
+                let normal_x = dx / overlap;
+                let normal_y = dy / overlap;
+                let relative_velocity_x = ball1.vx - ball2.vx;
+                let relative_velocity_y = ball1.vy - ball2.vy;
+                let dot_product = relative_velocity_x * normal_x + relative_velocity_y * normal_y;
+                if dot_product < 0.0 {
+                    let impulse = 2.0 * dot_product / (ball1_mass + ball2_mass);
+                    ball1.vx -= impulse * normal_x * ball2_mass;
+                    ball1.vy -= impulse * normal_y * ball2_mass;
+                    ball2.vx += impulse * normal_x * ball1_mass;
+                    ball2.vy += impulse * normal_y * ball1_mass;
 
-            if distance < min_distance {
-                did_change = true;
-                let overlap = min_distance - distance;
-                let overlap_per_ball = overlap / 2.0;
-                let dx = dx / distance * overlap_per_ball;
-                let dy = dy / distance * overlap_per_ball;
-                ball.x += dx;
-                ball.y += dy;
-                other.x -= dx;
-                other.y -= dy;
-                // Update velocities, taking into account mass
-                let total_mass = ball.mass() + other.mass();
-                let normal_x = dx / overlap_per_ball;
-                let normal_y = dy / overlap_per_ball;
-                let dot_product = (ball.vx - other.vx) * normal_x + (ball.vy - other.vy) * normal_y;
-                let impulse = 2.0 * dot_product / total_mass;
-                ball.vx -= impulse * other.mass();
-                ball.vy -= impulse * other.mass();
-                other.vx += impulse * ball.mass();
-                other.vy += impulse * ball.mass();
+                    ctx.db.balls().identity().update(ball1.clone());
+                    ctx.db.balls().identity().update(ball2);
 
-                ctx.db.balls().identity().update(other);
+                }
+
             }
         }
-        if did_change {
-            ctx.db.balls().identity().update(ball);
-        }
+
     }
 
     // log::info!("Updated balls");
@@ -118,13 +153,19 @@ pub fn init(_ctx: &ReducerContext) {
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) {
     // Add a new ball for the client
+    let rgb = Rgb {
+        r: ctx.random(),
+        g: ctx.random(),
+        b: ctx.random(),
+    };
     let ball = Ball {
         identity: ctx.sender,
         x: 0.0,
         y: 0.0,
         vx: 0.0,
         vy: 0.0,
-        radius: 2.0,
+        radius: 4.0,
+        color: rgb,
     };
     ctx.db.balls().insert(ball);
 }

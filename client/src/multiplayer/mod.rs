@@ -3,7 +3,7 @@ mod module_bindings;
 use std::sync::mpsc::{Receiver, Sender};
 use module_bindings::*;
 
-use spacetimedb_sdk::{credentials, DbContext, Error, Event, Identity, Status, Table, TableWithPrimaryKey};
+use spacetimedb_sdk::{credentials, DbContext, Error, Event, Identity, ScheduleAt, Status, Table, TableWithPrimaryKey, TimeDuration};
 
 pub use module_bindings::Ball;
 
@@ -40,8 +40,6 @@ pub fn connect_to(url: String) -> anyhow::Result<(Receiver<ReceiveMessage>, Send
 fn multiplayer_loop(url: String, receive_tx: Sender<ReceiveMessage>, send_rx: Receiver<SendMessage>) {
     // Connect to the database
     let ctx = connect_to_db(url);
-
-    // TODO: test accessibility of private/pub tables
 
     // Register callbacks to run in response to database events.
     register_callbacks(&ctx, receive_tx.clone());
@@ -121,7 +119,7 @@ fn subscribe_to_tables(ctx: &DbConnection) {
 }
 
 fn creds_store() -> credentials::File {
-    let rand_num = rand::random::<u64>();    
+    let rand_num = rand::random::<u64>();
     let filename = format!("{}-{}", DB_NAME, rand_num);
     credentials::File::new(filename)
 }

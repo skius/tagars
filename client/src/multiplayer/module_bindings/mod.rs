@@ -9,6 +9,7 @@ pub mod ball_type;
 pub mod balls_table;
 pub mod identity_connected_reducer;
 pub mod identity_disconnected_reducer;
+pub mod rgb_type;
 pub mod update_balls_reducer;
 pub mod update_balls_schedule_table;
 pub mod update_balls_schedule_type;
@@ -24,6 +25,7 @@ pub use identity_connected_reducer::{
 pub use identity_disconnected_reducer::{
     identity_disconnected, set_flags_for_identity_disconnected, IdentityDisconnectedCallbackId,
 };
+pub use rgb_type::Rgb;
 pub use update_balls_reducer::{set_flags_for_update_balls, update_balls, UpdateBallsCallbackId};
 pub use update_balls_schedule_table::*;
 pub use update_balls_schedule_type::UpdateBallsSchedule;
