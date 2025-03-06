@@ -2,7 +2,7 @@ use spacetimedb::{Identity, ReducerContext, ScheduleAt, Table, TimeDuration};
 
 
 #[spacetimedb::table(name = update_balls_schedule, scheduled(update_balls))]
-pub struct UpdateBallsSchedule {
+struct UpdateBallsSchedule {
     #[primary_key]
     #[auto_inc]
     scheduled_id: u64,
@@ -11,7 +11,7 @@ pub struct UpdateBallsSchedule {
 }
 
 #[derive(Clone)]
-#[spacetimedb::table(name = balls)]
+#[spacetimedb::table(name = balls, public)]
 pub struct Ball {
     #[primary_key]
     pub identity: Identity,
@@ -28,11 +28,16 @@ impl Ball {
     }
 }
 
-const DRAG: f64 = 0.99;
+const DRAG: f64 = 0.95;
 
 /// Runs every physics tick and updates each ball's position
 #[spacetimedb::reducer]
 fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
+    if ctx.sender != ctx.identity() {
+        log::warn!("Unauthorized attempt to update balls from identity {}", ctx.sender);
+        return;
+    }
+
     // Update positions individually
     for mut ball in ctx.db.balls().iter() {
         ball.vx *= DRAG;
