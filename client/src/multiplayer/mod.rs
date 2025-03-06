@@ -149,6 +149,9 @@ fn subscribe_to_tables(ctx: &DbConnection) {
         .subscribe(["SELECT * FROM balls", "SELECT * FROM foods"]);
 }
 
+// TODO: we don't need a creds store for tagars, since we don't have any auth nor persistent state.
+// in fact, we want to get a new identity each time we connect.
+// so just entirely remove this. with_token is also not needed.
 fn creds_store() -> credentials::File {
     let rand_num = rand::random::<u64>();
     let filename = format!("{}-{}", DB_NAME, rand_num);
