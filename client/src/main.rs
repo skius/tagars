@@ -1,34 +1,34 @@
+use crate::balls_interpolator::BallsInterpolatorComponent;
+use crate::multiplayer::{Ball, Food, ReceiveMessage, SendMessage};
+use crate::slingshot::SlingshotComponent;
+use crate::world::{World, WorldComponent};
+use clap::Parser;
+use crossterm::event::KeyCode;
+use spacetimedb_sdk::{Identity, Timestamp};
 use std::collections::HashMap;
 use std::io;
 use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
-use clap::Parser;
-use crossterm::event::KeyCode;
-use spacetimedb_sdk::{Identity, Timestamp};
 use teng::components::Component;
+use teng::components::debuginfo::{DebugInfoComponent, DebugMessage};
+use teng::rendering::color::Color;
 use teng::rendering::pixel::Pixel;
+use teng::rendering::render::{HalfBlockDisplayRender, Render};
 use teng::rendering::renderer::Renderer;
+use teng::util::for_coord_in_line;
 use teng::util::planarvec::Bounds;
 use teng::util::planarvec2_experimental::ExponentialGrowingBounds;
 use teng::{
-    install_panic_handler, terminal_cleanup, terminal_setup, Game, SetupInfo, SharedState,
-    UpdateInfo,
+    Game, SetupInfo, SharedState, UpdateInfo, install_panic_handler, terminal_cleanup,
+    terminal_setup,
 };
-use teng::components::debuginfo::{DebugInfoComponent, DebugMessage};
-use teng::rendering::color::Color;
-use teng::rendering::render::{HalfBlockDisplayRender, Render};
-use teng::util::for_coord_in_line;
-use crate::balls_interpolator::BallsInterpolatorComponent;
-use crate::multiplayer::{Ball, Food, ReceiveMessage, SendMessage};
-use crate::slingshot::SlingshotComponent;
-use crate::world::{World, WorldComponent};
 
+mod balls_interpolator;
 mod multiplayer;
 mod slingshot;
 mod world;
-mod balls_interpolator;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -116,18 +116,24 @@ impl GameComponent {
         while let Ok(message) = game_state.receiver().try_recv() {
             match message {
                 ReceiveMessage::NewBall(ball) => {
-                    game_state.raw_balls.insert(ball.identity.clone(), OldAndNewBall {
-                        old: ball.clone(),
-                        new: ball,
-                        timestamp_at_old: Instant::now(),
-                    });
+                    game_state.raw_balls.insert(
+                        ball.identity.clone(),
+                        OldAndNewBall {
+                            old: ball.clone(),
+                            new: ball,
+                            timestamp_at_old: Instant::now(),
+                        },
+                    );
                 }
                 ReceiveMessage::UpdateBall(old_ball, new_ball) => {
-                    game_state.raw_balls.insert(new_ball.identity.clone(), OldAndNewBall {
-                        old: old_ball,
-                        new: new_ball,
-                        timestamp_at_old: Instant::now(),
-                    });
+                    game_state.raw_balls.insert(
+                        new_ball.identity.clone(),
+                        OldAndNewBall {
+                            old: old_ball,
+                            new: new_ball,
+                            timestamp_at_old: Instant::now(),
+                        },
+                    );
                 }
                 ReceiveMessage::DeleteBall(identity) => {
                     game_state.raw_balls.remove(&identity);
@@ -157,7 +163,11 @@ impl GameComponent {
 
 impl Component<GameState> for GameComponent {
     fn setup(&mut self, setup_info: &SetupInfo, shared_state: &mut SharedState<GameState>) {
-        self.on_resize(setup_info.display_info.width(), setup_info.display_info.height(), shared_state);
+        self.on_resize(
+            setup_info.display_info.width(),
+            setup_info.display_info.height(),
+            shared_state,
+        );
         let receiver = self.receive_rx.take().unwrap();
         let sender = self.send_tx.take().unwrap();
         shared_state.custom.receive_rx = Some(receiver);
@@ -167,32 +177,44 @@ impl Component<GameState> for GameComponent {
     fn update(&mut self, update_info: UpdateInfo, shared_state: &mut SharedState<GameState>) {
         self.apply_messages(&mut shared_state.custom);
 
-        shared_state.debug_info.custom.insert("balls_length".to_string(), format!("balls: {}", shared_state.custom.balls.len()));
-        shared_state.debug_info.custom.insert("frametime ms".to_string(), format!("frametime: {:.2}ms", self.last_frametime.as_millis()));
-        
-        
+        shared_state.debug_info.custom.insert(
+            "balls_length".to_string(),
+            format!("balls: {}", shared_state.custom.balls.len()),
+        );
+        shared_state.debug_info.custom.insert(
+            "frametime ms".to_string(),
+            format!("frametime: {:.2}ms", self.last_frametime.as_millis()),
+        );
+
         // listen to keyboard events to apply impulses
         let impulse_strength = 10.0;
         let mut impulse = (0.0, 0.0);
-        if shared_state.pressed_keys.did_press_char_ignore_case('w') || shared_state.pressed_keys.did_press(KeyCode::Up) {
+        if shared_state.pressed_keys.did_press_char_ignore_case('w')
+            || shared_state.pressed_keys.did_press(KeyCode::Up)
+        {
             impulse.1 += impulse_strength;
         }
-        if shared_state.pressed_keys.did_press_char_ignore_case('a') || shared_state.pressed_keys.did_press(KeyCode::Left) {
+        if shared_state.pressed_keys.did_press_char_ignore_case('a')
+            || shared_state.pressed_keys.did_press(KeyCode::Left)
+        {
             impulse.0 -= impulse_strength;
         }
-        if shared_state.pressed_keys.did_press_char_ignore_case('s') || shared_state.pressed_keys.did_press(KeyCode::Down) {
+        if shared_state.pressed_keys.did_press_char_ignore_case('s')
+            || shared_state.pressed_keys.did_press(KeyCode::Down)
+        {
             impulse.1 -= impulse_strength;
         }
-        if shared_state.pressed_keys.did_press_char_ignore_case('d') || shared_state.pressed_keys.did_press(KeyCode::Right) {
+        if shared_state.pressed_keys.did_press_char_ignore_case('d')
+            || shared_state.pressed_keys.did_press(KeyCode::Right)
+        {
             impulse.0 += impulse_strength;
         }
-        
+
         if impulse != (0.0, 0.0) {
             let message = SendMessage::Impulse(impulse.0, impulse.1);
             shared_state.custom.sender().send(message).unwrap();
         }
-        
-        
+
         // use mouse look dir to apply impulse
         let (x, y) = shared_state.mouse_info.last_mouse_pos;
         let x = x as i64;
@@ -202,7 +224,7 @@ impl Component<GameState> for GameComponent {
         let center_y = shared_state.display_info.height() as i64 / 2;
         let diff_x = x - center_x;
         let diff_y = y - center_y;
-        let diff_y = -2*diff_y; // pixel ratio of 2, upside down
+        let diff_y = -2 * diff_y; // pixel ratio of 2, upside down
 
         // if shared_state.pressed_keys.did_press_char(' ') {
         // if shared_state.mouse_info.right_mouse_down {

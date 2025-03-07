@@ -25,28 +25,28 @@ pub mod update_balls_schedule_table;
 pub mod update_balls_schedule_type;
 
 pub use apply_impulse_reducer::{
-    apply_impulse, set_flags_for_apply_impulse, ApplyImpulseCallbackId,
+    ApplyImpulseCallbackId, apply_impulse, set_flags_for_apply_impulse,
 };
 pub use ball_type::Ball;
 pub use balls_table::*;
 pub use food_type::Food;
 pub use foods_table::*;
 pub use identity_connected_reducer::{
-    identity_connected, set_flags_for_identity_connected, IdentityConnectedCallbackId,
+    IdentityConnectedCallbackId, identity_connected, set_flags_for_identity_connected,
 };
 pub use identity_disconnected_reducer::{
-    identity_disconnected, set_flags_for_identity_disconnected, IdentityDisconnectedCallbackId,
+    IdentityDisconnectedCallbackId, identity_disconnected, set_flags_for_identity_disconnected,
 };
 pub use physics_tick_type::PhysicsTick;
 pub use physics_ticks_table::*;
-pub use respawn_ball_reducer::{respawn_ball, set_flags_for_respawn_ball, RespawnBallCallbackId};
+pub use respawn_ball_reducer::{RespawnBallCallbackId, respawn_ball, set_flags_for_respawn_ball};
 pub use respawn_balls_schedule_table::*;
 pub use respawn_balls_schedule_type::RespawnBallsSchedule;
 pub use rgb_type::Rgb;
-pub use spawn_food_reducer::{set_flags_for_spawn_food, spawn_food, SpawnFoodCallbackId};
+pub use spawn_food_reducer::{SpawnFoodCallbackId, set_flags_for_spawn_food, spawn_food};
 pub use spawn_food_schedule_type::SpawnFoodSchedule;
 pub use spawn_foods_schedule_table::*;
-pub use update_balls_reducer::{set_flags_for_update_balls, update_balls, UpdateBallsCallbackId};
+pub use update_balls_reducer::{UpdateBallsCallbackId, set_flags_for_update_balls, update_balls};
 pub use update_balls_schedule_table::*;
 pub use update_balls_schedule_type::UpdateBallsSchedule;
 
@@ -508,21 +508,21 @@ impl __sdk::SubscriptionHandle for SubscriptionHandle {
 /// either a [`DbConnection`] or an [`EventContext`] and operate on either.
 pub trait RemoteDbContext:
     __sdk::DbContext<
-    DbView = RemoteTables,
-    Reducers = RemoteReducers,
-    SetReducerFlags = SetReducerFlags,
-    SubscriptionBuilder = __sdk::SubscriptionBuilder<RemoteModule>,
->
+        DbView = RemoteTables,
+        Reducers = RemoteReducers,
+        SetReducerFlags = SetReducerFlags,
+        SubscriptionBuilder = __sdk::SubscriptionBuilder<RemoteModule>,
+    >
 {
 }
 impl<
-        Ctx: __sdk::DbContext<
+    Ctx: __sdk::DbContext<
             DbView = RemoteTables,
             Reducers = RemoteReducers,
             SetReducerFlags = SetReducerFlags,
             SubscriptionBuilder = __sdk::SubscriptionBuilder<RemoteModule>,
         >,
-    > RemoteDbContext for Ctx
+> RemoteDbContext for Ctx
 {
 }
 

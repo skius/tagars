@@ -1,7 +1,7 @@
-use teng::components::Component;
-use teng::{SharedState, UpdateInfo};
 use crate::GameState;
 use crate::multiplayer::Ball;
+use teng::components::Component;
+use teng::{SharedState, UpdateInfo};
 
 pub struct BallsInterpolatorComponent {
     do_interpolation: bool,
@@ -19,7 +19,9 @@ impl Component<GameState> for BallsInterpolatorComponent {
         if !self.do_interpolation {
             // simply copy over the most recent state to the output field
             for (identity, old_and_new_ball) in game_state.raw_balls.iter() {
-                game_state.balls.insert(identity.clone(), old_and_new_ball.new.clone());
+                game_state
+                    .balls
+                    .insert(identity.clone(), old_and_new_ball.new.clone());
             }
         } else {
             const PHYSICS_TICKS_PER_SECOND: f64 = 60.0;

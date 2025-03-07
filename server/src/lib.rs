@@ -1,7 +1,9 @@
 mod spatial_hash_grid;
 
-use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, TimeDuration, Timestamp};
 use crate::spatial_hash_grid::{Aabb, SpatialHashGrid, SpatialHashable};
+use spacetimedb::{
+    Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, TimeDuration, Timestamp,
+};
 
 #[spacetimedb::table(name = spawn_foods_schedule, scheduled(spawn_food))]
 struct SpawnFoodSchedule {
@@ -90,8 +92,10 @@ impl Ball {
     }
 
     pub fn random_pos_in_game_field(ctx: &ReducerContext) -> (f64, f64) {
-        let x = ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_X - Ball::WORLD_BORDER_MIN_X) + Ball::WORLD_BORDER_MIN_X;
-        let y = ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_Y - Ball::WORLD_BORDER_MIN_Y) + Ball::WORLD_BORDER_MIN_Y;
+        let x = ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_X - Ball::WORLD_BORDER_MIN_X)
+            + Ball::WORLD_BORDER_MIN_X;
+        let y = ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_Y - Ball::WORLD_BORDER_MIN_Y)
+            + Ball::WORLD_BORDER_MIN_Y;
         (x, y)
     }
 
@@ -157,7 +161,7 @@ impl Ball {
 
         let dx = self.x - other.x;
         let dy = self.y - other.y;
-        let distance = (dx*dx + dy*dy).sqrt();
+        let distance = (dx * dx + dy * dy).sqrt();
         let overlap = self.radius + other.radius - distance;
         if overlap > 0.0 {
             // we are colliding
@@ -214,10 +218,19 @@ const DRAG: f64 = 0.95;
 #[spacetimedb::reducer]
 fn respawn_ball(ctx: &ReducerContext, schedule: RespawnBallsSchedule) {
     if ctx.sender != ctx.identity() {
-        log::warn!("Unauthorized attempt to respawn ball from identity {}", ctx.sender);
+        log::warn!(
+            "Unauthorized attempt to respawn ball from identity {}",
+            ctx.sender
+        );
         return;
     }
-    if ctx.db.balls().identity().find(schedule.respawn_for_identity).is_none() {
+    if ctx
+        .db
+        .balls()
+        .identity()
+        .find(schedule.respawn_for_identity)
+        .is_none()
+    {
         // player disconnected, no need to respawn
         return;
     }
@@ -231,7 +244,10 @@ fn respawn_ball(ctx: &ReducerContext, schedule: RespawnBallsSchedule) {
 #[spacetimedb::reducer]
 fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
     if ctx.sender != ctx.identity() {
-        log::warn!("Unauthorized attempt to update balls from identity {}", ctx.sender);
+        log::warn!(
+            "Unauthorized attempt to update balls from identity {}",
+            ctx.sender
+        );
         return;
     }
 
@@ -243,15 +259,24 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
     ctx.db.physics_ticks().insert(tick);
     // delete ticks older than 1 second
     let one_second_ago = ctx.timestamp + TimeDuration::from_micros(-1_000_000);
-    for tick in ctx.db.physics_ticks().iter().filter(|t| t.ticked_at < one_second_ago) {
+    for tick in ctx
+        .db
+        .physics_ticks()
+        .iter()
+        .filter(|t| t.ticked_at < one_second_ago)
+    {
         ctx.db.physics_ticks().tick_id().delete(tick.tick_id);
     }
 
     // skip
     // return;
 
-
-    let mut balls = ctx.db.balls().iter().filter(|b| !b.dead).collect::<Vec<_>>();
+    let mut balls = ctx
+        .db
+        .balls()
+        .iter()
+        .filter(|b| !b.dead)
+        .collect::<Vec<_>>();
 
     // (food, keep) pairs
     let mut foods = ctx.db.foods().iter().map(|f| (f, true)).collect::<Vec<_>>();
@@ -293,7 +318,7 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
             }
             let dx = ball.x - food.x;
             let dy = ball.y - food.y;
-            let distance = (dx*dx + dy*dy).sqrt();
+            let distance = (dx * dx + dy * dy).sqrt();
             if distance < ball.radius {
                 // ball eats food
                 ball.add_mass(Food::MASS);
@@ -369,7 +394,7 @@ fn apply_impulse(ctx: &ReducerContext, mut impulse_x: f64, mut impulse_y: f64) {
     let mut ball = ctx.db.balls().identity().find(ctx.sender).unwrap();
 
     // cap impulse
-    let impulse = (impulse_x*impulse_x + impulse_y*impulse_y).sqrt();
+    let impulse = (impulse_x * impulse_x + impulse_y * impulse_y).sqrt();
     let max_impulse = 20.0;
     if impulse > max_impulse {
         let scale = max_impulse / impulse;
@@ -390,7 +415,7 @@ fn apply_impulse(ctx: &ReducerContext, mut impulse_x: f64, mut impulse_y: f64) {
 
     // cap max velocity, different max per radius
     let max_velocity = 10.0 / (ball.radius - Ball::DEFAULT_RADIUS + 1.0).powf(0.8);
-    let velocity = (ball.vx*ball.vx + ball.vy*ball.vy).sqrt();
+    let velocity = (ball.vx * ball.vx + ball.vy * ball.vy).sqrt();
     if velocity > max_velocity {
         let scale = max_velocity / velocity;
         ball.vx *= scale;
@@ -403,7 +428,10 @@ fn apply_impulse(ctx: &ReducerContext, mut impulse_x: f64, mut impulse_y: f64) {
 #[spacetimedb::reducer]
 fn spawn_food(ctx: &ReducerContext, _schedule: SpawnFoodSchedule) {
     if ctx.sender != ctx.identity() {
-        log::warn!("Unauthorized attempt to spawn food from identity {}", ctx.sender);
+        log::warn!(
+            "Unauthorized attempt to spawn food from identity {}",
+            ctx.sender
+        );
         return;
     }
 
@@ -415,8 +443,10 @@ fn spawn_food(ctx: &ReducerContext, _schedule: SpawnFoodSchedule) {
     for _ in 0..100 {
         let food = Food {
             id: 0,
-            x: ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_X - Ball::WORLD_BORDER_MIN_X) + Ball::WORLD_BORDER_MIN_X,
-            y: ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_Y - Ball::WORLD_BORDER_MIN_Y) + Ball::WORLD_BORDER_MIN_Y,
+            x: ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_X - Ball::WORLD_BORDER_MIN_X)
+                + Ball::WORLD_BORDER_MIN_X,
+            y: ctx.random::<f64>() * (Ball::WORLD_BORDER_MAX_Y - Ball::WORLD_BORDER_MIN_Y)
+                + Ball::WORLD_BORDER_MIN_Y,
             color: Rgb {
                 r: ctx.random(),
                 g: ctx.random(),
@@ -457,4 +487,3 @@ pub fn identity_disconnected(ctx: &ReducerContext) {
     // Remove the ball for the client
     ctx.db.balls().identity().delete(ctx.sender);
 }
-

@@ -1,15 +1,15 @@
 mod module_bindings;
 
-use std::sync::mpsc::{Receiver, Sender};
 use module_bindings::*;
+use std::sync::mpsc::{Receiver, Sender};
 
-use spacetimedb_sdk::{credentials, DbContext, Error, Event, Identity, ScheduleAt, Status, Table, TableWithPrimaryKey, TimeDuration, Timestamp};
+use spacetimedb_sdk::{
+    DbContext, Error, Event, Identity, ScheduleAt, Status, Table, TableWithPrimaryKey,
+    TimeDuration, Timestamp, credentials,
+};
 
 pub use module_bindings::Ball;
 pub use module_bindings::Food;
-
-
-
 
 #[derive(Debug)]
 pub enum ReceiveMessage {
@@ -25,10 +25,8 @@ pub enum ReceiveMessage {
 }
 
 pub enum SendMessage {
-    Impulse(f64, f64)
+    Impulse(f64, f64),
 }
-
-
 
 /// Connect to the server at the given URL.
 ///
@@ -43,7 +41,11 @@ pub fn connect_to(url: String) -> anyhow::Result<(Receiver<ReceiveMessage>, Send
     Ok((receive_rx, send_tx))
 }
 
-fn multiplayer_loop(url: String, receive_tx: Sender<ReceiveMessage>, send_rx: Receiver<SendMessage>) {
+fn multiplayer_loop(
+    url: String,
+    receive_tx: Sender<ReceiveMessage>,
+    send_rx: Receiver<SendMessage>,
+) {
     // Connect to the database
     let ctx = connect_to_db(url);
 
@@ -59,14 +61,14 @@ fn multiplayer_loop(url: String, receive_tx: Sender<ReceiveMessage>, send_rx: Re
     while ctx.try_identity().is_none() {
         std::thread::sleep(std::time::Duration::from_millis(1));
     }
-    receive_tx.send(ReceiveMessage::OurIdentity(ctx.identity())).unwrap();
+    receive_tx
+        .send(ReceiveMessage::OurIdentity(ctx.identity()))
+        .unwrap();
 
     // Handle input
     loop {
         match send_rx.recv() {
-            Ok(SendMessage::Impulse(x, y)) => {
-                ctx.reducers.apply_impulse(x, y).unwrap()
-            }
+            Ok(SendMessage::Impulse(x, y)) => ctx.reducers.apply_impulse(x, y).unwrap(),
             Err(_) => break,
         }
     }
@@ -110,7 +112,11 @@ fn register_callbacks(ctx: &DbConnection, tx: Sender<ReceiveMessage>) {
     {
         let tx = tx.clone();
         ctx.db.balls().on_update(move |ctx, old_ball, new_ball| {
-            tx.send(ReceiveMessage::UpdateBall(old_ball.clone(), new_ball.clone())).unwrap();
+            tx.send(ReceiveMessage::UpdateBall(
+                old_ball.clone(),
+                new_ball.clone(),
+            ))
+            .unwrap();
         });
     }
 
@@ -132,7 +138,8 @@ fn register_callbacks(ctx: &DbConnection, tx: Sender<ReceiveMessage>) {
     {
         let tx = tx.clone();
         ctx.db.foods().on_update(move |ctx, old_food, new_food| {
-            tx.send(ReceiveMessage::UpdateFood(new_food.clone())).unwrap();
+            tx.send(ReceiveMessage::UpdateFood(new_food.clone()))
+                .unwrap();
         });
     }
 
@@ -142,20 +149,24 @@ fn register_callbacks(ctx: &DbConnection, tx: Sender<ReceiveMessage>) {
             tx.send(ReceiveMessage::DeleteFood(food.id)).unwrap();
         });
     }
-    
+
     // physics ticks inserts
     {
         let tx = tx.clone();
         ctx.db.physics_ticks().on_insert(move |ctx, tick| {
-            tx.send(ReceiveMessage::NewPhysicsTick(tick.ticked_at)).unwrap();
+            tx.send(ReceiveMessage::NewPhysicsTick(tick.ticked_at))
+                .unwrap();
         });
     }
 }
 
 /// Register subscriptions for all rows of both tables.
 fn subscribe_to_tables(ctx: &DbConnection) {
-    ctx.subscription_builder()
-        .subscribe(["SELECT * FROM balls", "SELECT * FROM foods", "SELECT * FROM physics_ticks"]);
+    ctx.subscription_builder().subscribe([
+        "SELECT * FROM balls",
+        "SELECT * FROM foods",
+        "SELECT * FROM physics_ticks",
+    ]);
 }
 
 // TODO: we don't need a creds store for tagars, since we don't have any auth nor persistent state.

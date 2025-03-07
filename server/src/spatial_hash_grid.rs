@@ -44,7 +44,7 @@ impl<T> SpatialHashGrid<T> {
 
     pub fn insert(&mut self, item: T)
     where
-        T: SpatialHashable + Clone
+        T: SpatialHashable + Clone,
     {
         let aabb = item.get_aabb();
         self.insert_with_aabb(item, aabb)
@@ -52,17 +52,17 @@ impl<T> SpatialHashGrid<T> {
 
     pub fn insert_with_aabb(&mut self, item: T, aabb: Aabb)
     where
-        T: Clone
+        T: Clone,
     {
         for cell in aabb.get_cells(self.cell_size) {
             self.grid.entry(cell).or_default().push(item.clone());
         }
     }
-    
+
     pub fn get(&self, cell: Cell) -> impl Iterator<Item = &T> {
         self.grid.get(&cell).into_iter().flat_map(|v| v.iter())
     }
-    
+
     pub fn get_for_aabb(&self, aabb: Aabb) -> impl Iterator<Item = &T> {
         aabb.get_cells(self.cell_size)
             .flat_map(move |cell| self.get(cell))

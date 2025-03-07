@@ -1,3 +1,4 @@
+use crate::{GameState, multiplayer};
 use crossterm::event::{Event, MouseButton, MouseEventKind};
 use teng::components::Component;
 use teng::rendering::color::Color;
@@ -5,7 +6,6 @@ use teng::rendering::render::{HalfBlockDisplayRender, Render};
 use teng::rendering::renderer::Renderer;
 use teng::util::for_coord_in_line;
 use teng::{BreakingAction, SetupInfo, SharedState, UpdateInfo};
-use crate::{multiplayer, GameState};
 
 pub struct SlingshotComponent {
     // 'Some' with screen coords of the first mouse down event during this slingshot
@@ -30,7 +30,11 @@ impl SlingshotComponent {
 
 impl Component<GameState> for SlingshotComponent {
     fn setup(&mut self, setup_info: &SetupInfo, shared_state: &mut SharedState<GameState>) {
-        self.on_resize(setup_info.display_info.width(), setup_info.display_info.height(), shared_state);
+        self.on_resize(
+            setup_info.display_info.width(),
+            setup_info.display_info.height(),
+            shared_state,
+        );
     }
 
     fn on_resize(
@@ -73,8 +77,6 @@ impl Component<GameState> for SlingshotComponent {
 
         let mut slingshot = None;
 
-
-
         // if we have an in-bounds first_down and a last_release (anywhere), set a slingshot
         if let Some((initial_x, initial_y)) = self.first_down {
             if let Some((last_x, last_y)) = self.last_release {
@@ -98,7 +100,10 @@ impl Component<GameState> for SlingshotComponent {
             let impulse_x = s_x as f64 * AMPLIFIER;
             let impulse_y = s_y as f64 * AMPLIFIER * 2.0;
 
-            game_state.sender().send(multiplayer::SendMessage::Impulse(impulse_x, impulse_y)).unwrap();
+            game_state
+                .sender()
+                .send(multiplayer::SendMessage::Impulse(impulse_x, impulse_y))
+                .unwrap();
 
             self.first_down = None;
             self.last_release = None;

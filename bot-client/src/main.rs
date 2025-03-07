@@ -1,13 +1,15 @@
 mod module_bindings;
 
+use clap::Parser;
+use module_bindings::*;
+use rand::Rng;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
-use clap::Parser;
-use rand::Rng;
-use module_bindings::*;
 
-use spacetimedb_sdk::{credentials, DbContext, Error, Event, Identity, ScheduleAt, Status, Table, TableWithPrimaryKey, TimeDuration};
-
+use spacetimedb_sdk::{
+    DbContext, Error, Event, Identity, ScheduleAt, Status, Table, TableWithPrimaryKey,
+    TimeDuration, credentials,
+};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -25,7 +27,7 @@ fn main() {
     let args = Args::parse();
 
     let url = args.server;
-    
+
     for _ in 0..args.bots {
         let url = url.clone();
         thread::spawn(|| {
@@ -37,8 +39,6 @@ fn main() {
         thread::sleep(std::time::Duration::from_millis(1000));
     }
 }
-
-
 
 fn multiplayer_loop(url: String) {
     // Connect to the database
@@ -52,10 +52,10 @@ fn multiplayer_loop(url: String) {
 
     // Spawn a thread, where the connection will process messages and invoke callbacks.
     ctx.run_threaded();
-    
+
     let mut rng = rand::thread_rng();
     let sleep_duration = std::time::Duration::from_millis(300);
-    
+
     // Handle input
     loop {
         thread::sleep(sleep_duration);
@@ -65,7 +65,7 @@ fn multiplayer_loop(url: String) {
         let magnitude = rng.random::<f64>() * 3.0;
         let impulse_x = angle.cos() * magnitude;
         let impulse_y = angle.sin() * magnitude;
-        
+
         ctx.reducers.apply_impulse(impulse_x, impulse_y).unwrap()
     }
 }
@@ -92,9 +92,7 @@ fn connect_to_db(url: String) -> DbConnection {
 }
 
 /// Register all the callbacks our app will use to respond to database events.
-fn register_callbacks(ctx: &DbConnection) {
-
-}
+fn register_callbacks(ctx: &DbConnection) {}
 
 /// Register subscriptions for all rows of both tables.
 fn subscribe_to_tables(ctx: &DbConnection) {
@@ -103,9 +101,7 @@ fn subscribe_to_tables(ctx: &DbConnection) {
 }
 
 /// Our `on_connect` callback: save our credentials to a file.
-fn on_connected(_ctx: &DbConnection, _identity: Identity, token: &str) {
-
-}
+fn on_connected(_ctx: &DbConnection, _identity: Identity, token: &str) {}
 
 fn on_connect_error(_ctx: &ErrorContext, err: Error) {
     panic!("Failed to connect: {:?}", err);

@@ -1,14 +1,14 @@
+use crate::GameState;
 use teng::components::Component;
-use teng::{SetupInfo, SharedState, UpdateInfo};
 use teng::rendering::color::Color;
 use teng::rendering::pixel::Pixel;
 use teng::rendering::render::{HalfBlockDisplayRender, Render};
 use teng::rendering::renderer::Renderer;
 use teng::util::bidivec::BidiVec;
 use teng::util::for_coord_in_line;
-use teng::util::planarvec2_experimental::Bounds;
 use teng::util::planarvec::PlanarVec;
-use crate::GameState;
+use teng::util::planarvec2_experimental::Bounds;
+use teng::{SetupInfo, SharedState, UpdateInfo};
 
 #[derive(Debug, Default)]
 pub struct World {
@@ -35,7 +35,6 @@ impl World {
 
         let screen_x = world_x - camera_x;
         let screen_y = camera_y - world_y;
-
 
         (screen_x, screen_y)
     }
@@ -71,10 +70,19 @@ impl WorldComponent {
 
 impl Component<GameState> for WorldComponent {
     fn setup(&mut self, setup_info: &SetupInfo, shared_state: &mut SharedState<GameState>) {
-        self.on_resize(setup_info.display_info.width(), setup_info.display_info.height(), shared_state);
+        self.on_resize(
+            setup_info.display_info.width(),
+            setup_info.display_info.height(),
+            shared_state,
+        );
     }
 
-    fn on_resize(&mut self, width: usize, height: usize, shared_state: &mut SharedState<GameState>) {
+    fn on_resize(
+        &mut self,
+        width: usize,
+        height: usize,
+        shared_state: &mut SharedState<GameState>,
+    ) {
         shared_state.custom.world.screen_width = width;
         shared_state.custom.world.screen_height = 2 * height;
         self.display.resize_discard(width, 2 * height);
@@ -82,9 +90,14 @@ impl Component<GameState> for WorldComponent {
     }
 
     fn update(&mut self, update_info: UpdateInfo, shared_state: &mut SharedState<GameState>) {
-        let our_ball = shared_state.custom.our_identity.as_ref().and_then(|identity| shared_state.custom.balls.get(identity));
+        let our_ball = shared_state
+            .custom
+            .our_identity
+            .as_ref()
+            .and_then(|identity| shared_state.custom.balls.get(identity));
         if let Some(ball) = our_ball {
-            shared_state.custom.world.camera_attach = (ball.x.floor() as i64, ball.y.floor() as i64);
+            shared_state.custom.world.camera_attach =
+                (ball.x.floor() as i64, ball.y.floor() as i64);
         }
 
         // render to half block display
@@ -98,7 +111,11 @@ impl Component<GameState> for WorldComponent {
             for sy in 0..shared_state.custom.world.screen_height {
                 let (x, y) = (sx as i64, sy as i64);
                 let (x, y) = shared_state.custom.world.to_world_pos(x, y);
-                if x < World::WORLD_BORDER_MIN_X || x >= World::WORLD_BORDER_MAX_X || y < World::WORLD_BORDER_MIN_Y || y >= World::WORLD_BORDER_MAX_Y {
+                if x < World::WORLD_BORDER_MIN_X
+                    || x >= World::WORLD_BORDER_MAX_X
+                    || y < World::WORLD_BORDER_MIN_Y
+                    || y >= World::WORLD_BORDER_MAX_Y
+                {
                     continue;
                 }
                 let scaled_x = (x as f64 / checkerboard_width as f64).floor() as i64;
@@ -111,35 +128,58 @@ impl Component<GameState> for WorldComponent {
                 self.display.set_color(sx, sy, color);
             }
         }
-        
+
         // draw foods
         for food in shared_state.custom.foods.values() {
-            let (screen_x, screen_y) = shared_state.custom.world.to_screen_pos(food.x.floor() as i64, food.y.floor() as i64);
+            let (screen_x, screen_y) = shared_state
+                .custom
+                .world
+                .to_screen_pos(food.x.floor() as i64, food.y.floor() as i64);
             let color = Color::Rgb([food.color.r, food.color.g, food.color.b]);
-            self.display.set_color(screen_x as usize, screen_y as usize, color);
+            self.display
+                .set_color(screen_x as usize, screen_y as usize, color);
         }
 
         for ball in shared_state.custom.balls.values() {
             if ball.dead {
                 continue;
             }
-            let (screen_x, screen_y) = shared_state.custom.world.to_screen_pos(ball.x.floor() as i64, ball.y.floor() as i64);
+            let (screen_x, screen_y) = shared_state
+                .custom
+                .world
+                .to_screen_pos(ball.x.floor() as i64, ball.y.floor() as i64);
             let radius = ball.radius as i64 + 1;
-            for_coord_in_line(false, (screen_x - radius, 0), (screen_x + radius, 0), |x, _| {
-                for_coord_in_line(false, (0, screen_y - radius), (0, screen_y + radius), |_, y| {
-                    if (x - screen_x).pow(2) + (y - screen_y).pow(2) < radius.pow(2) {
-                        if x < 0 || y < 0 {
-                            return;
-                        }
-                        let rgb = [ball.color.r, ball.color.g, ball.color.b];
-                        self.display.set_color(x as usize, y as usize, Color::Rgb(rgb));
-                    }
-                });
-            });
+            for_coord_in_line(
+                false,
+                (screen_x - radius, 0),
+                (screen_x + radius, 0),
+                |x, _| {
+                    for_coord_in_line(
+                        false,
+                        (0, screen_y - radius),
+                        (0, screen_y + radius),
+                        |_, y| {
+                            if (x - screen_x).pow(2) + (y - screen_y).pow(2) < radius.pow(2) {
+                                if x < 0 || y < 0 {
+                                    return;
+                                }
+                                let rgb = [ball.color.r, ball.color.g, ball.color.b];
+                                self.display
+                                    .set_color(x as usize, y as usize, Color::Rgb(rgb));
+                            }
+                        },
+                    );
+                },
+            );
         }
     }
 
-    fn render(&self, renderer: &mut dyn Renderer, shared_state: &SharedState<GameState>, depth_base: i32) {
+    fn render(
+        &self,
+        renderer: &mut dyn Renderer,
+        shared_state: &SharedState<GameState>,
+        depth_base: i32,
+    ) {
         let checkerboard_pattern_depth = depth_base;
         let coord_depth = checkerboard_pattern_depth + 1;
         let balls_depth = coord_depth + 1;
@@ -153,7 +193,7 @@ impl Component<GameState> for WorldComponent {
         for y in 0..world.screen_height {
             let world_y = world.to_world_pos(0, y as i64).1;
             if world_y % 20 == 0 {
-                format!("{:?}", world_y).render(renderer, 0, y/2, coord_depth);
+                format!("{:?}", world_y).render(renderer, 0, y / 2, coord_depth);
             }
         }
 
@@ -169,6 +209,4 @@ impl Component<GameState> for WorldComponent {
             }
         }
     }
-
 }
-
