@@ -246,7 +246,7 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
     for tick in ctx.db.physics_ticks().iter().filter(|t| t.ticked_at < one_second_ago) {
         ctx.db.physics_ticks().tick_id().delete(tick.tick_id);
     }
-    
+
     // skip
     // return;
 
