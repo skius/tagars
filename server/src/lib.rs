@@ -1,4 +1,7 @@
+mod spatial_hash_grid;
+
 use spacetimedb::{Identity, ReducerContext, ScheduleAt, SpacetimeType, Table, TimeDuration, Timestamp};
+use crate::spatial_hash_grid::{Aabb, SpatialHashGrid, SpatialHashable};
 
 #[spacetimedb::table(name = spawn_foods_schedule, scheduled(spawn_food))]
 struct SpawnFoodSchedule {
@@ -195,6 +198,17 @@ impl Ball {
     }
 }
 
+impl SpatialHashable for Ball {
+    fn get_aabb(&self) -> Aabb {
+        Aabb {
+            min_x: (self.x - self.radius).floor() as i64,
+            min_y: (self.y - self.radius).floor() as i64,
+            max_x: (self.x + self.radius).floor() as i64,
+            max_y: (self.y + self.radius).floor() as i64,
+        }
+    }
+}
+
 const DRAG: f64 = 0.95;
 
 #[spacetimedb::reducer]
@@ -232,6 +246,9 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
     for tick in ctx.db.physics_ticks().iter().filter(|t| t.ticked_at < one_second_ago) {
         ctx.db.physics_ticks().tick_id().delete(tick.tick_id);
     }
+    
+    // skip
+    // return;
 
 
     let mut balls = ctx.db.balls().iter().filter(|b| !b.dead).collect::<Vec<_>>();
@@ -286,24 +303,54 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
     }
 
     // Update collisions
-    for ball1_idx in 0..balls.len() {
-        if balls[ball1_idx].dead {
-            continue;
-        }
-        for ball2_idx in ball1_idx+1..balls.len() {
-            if balls[ball2_idx].dead {
+    // for ball1_idx in 0..balls.len() {
+    //     if balls[ball1_idx].dead {
+    //         continue;
+    //     }
+    //     for ball2_idx in ball1_idx+1..balls.len() {
+    //         if balls[ball2_idx].dead {
+    //             continue;
+    //         }
+    //         let (balls1, balls2) = balls.split_at_mut(ball2_idx);
+    //         let ball1 = &mut balls1[ball1_idx];
+    //         let ball2 = &mut balls2[0];
+    //
+    //         ball1.handle_collision(ball2, ctx);
+    //         if ball1.dead {
+    //             break;
+    //         }
+    //     }
+    //
+    // }
+
+    // update collisions fast
+    let mut grid = SpatialHashGrid::new(10);
+    for (idx, ball) in balls.iter().enumerate() {
+        grid.insert_with_aabb(idx, ball.get_aabb());
+    }
+
+    for idx1 in 0..balls.len() {
+        let aabb = balls[idx1].get_aabb();
+        for &idx2 in grid.get_for_aabb(aabb) {
+            if idx1 == idx2 {
                 continue;
             }
-            let (balls1, balls2) = balls.split_at_mut(ball2_idx);
-            let ball1 = &mut balls1[ball1_idx];
+            if balls[idx1].dead {
+                break;
+            }
+            if balls[idx2].dead {
+                continue;
+            }
+            let idx_min = idx1.min(idx2);
+            let idx_max = idx1.max(idx2);
+            let (balls1, balls2) = balls.split_at_mut(idx_max);
+            let ball1 = &mut balls1[idx_min];
             let ball2 = &mut balls2[0];
-
             ball1.handle_collision(ball2, ctx);
             if ball1.dead {
                 break;
             }
         }
-
     }
 
     for ball in balls {
