@@ -25,6 +25,10 @@ impl Component<GameState> for BallsInterpolatorComponent {
             }
         } else {
             const PHYSICS_TICKS_PER_SECOND: f64 = 60.0;
+            //TODO: use the diff between old and new times as tick duration. currently we dont interpolate if the server is slow.
+            // ah, we don't actually get this. We use client-side time to determine old timestamp.
+            // we don't use server-side because the clocks differ, so we can't interpolate properly.
+            // we could store a mapping from old_server_side to client_side_when_old_received.
             let physics_tick_duration = 1.0 / PHYSICS_TICKS_PER_SECOND;
 
             // interpolate between old and new balls
