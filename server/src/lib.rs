@@ -29,6 +29,14 @@ struct RespawnBallsSchedule {
     respawn_for_identity: Identity,
 }
 
+#[spacetimedb::table(name = physics_ticks, public)]
+struct PhysicsTick {
+    #[primary_key]
+    #[auto_inc]
+    tick_id: u64,
+    ticked_at: Timestamp,
+}
+
 #[spacetimedb::table(name = foods, public)]
 pub struct Food {
     #[primary_key]
@@ -195,6 +203,10 @@ fn respawn_ball(ctx: &ReducerContext, schedule: RespawnBallsSchedule) {
         log::warn!("Unauthorized attempt to respawn ball from identity {}", ctx.sender);
         return;
     }
+    if ctx.db.balls().identity().find(schedule.respawn_for_identity).is_none() {
+        // player disconnected, no need to respawn
+        return;
+    }
 
     // insert a new ball for identity
     let ball = Ball::spawn_ball(ctx, schedule.respawn_for_identity);
@@ -208,6 +220,19 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
         log::warn!("Unauthorized attempt to update balls from identity {}", ctx.sender);
         return;
     }
+
+    // insert physics tick
+    let tick = PhysicsTick {
+        tick_id: 0,
+        ticked_at: ctx.timestamp,
+    };
+    ctx.db.physics_ticks().insert(tick);
+    // delete ticks older than 1 second
+    let one_second_ago = ctx.timestamp + TimeDuration::from_micros(-1_000_000);
+    for tick in ctx.db.physics_ticks().iter().filter(|t| t.ticked_at < one_second_ago) {
+        ctx.db.physics_ticks().tick_id().delete(tick.tick_id);
+    }
+
 
     let mut balls = ctx.db.balls().iter().filter(|b| !b.dead).collect::<Vec<_>>();
 

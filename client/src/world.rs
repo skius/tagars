@@ -124,10 +124,10 @@ impl Component<GameState> for WorldComponent {
                 continue;
             }
             let (screen_x, screen_y) = shared_state.custom.world.to_screen_pos(ball.x.floor() as i64, ball.y.floor() as i64);
-            let radius = ball.radius as i64;
+            let radius = ball.radius as i64 + 1;
             for_coord_in_line(false, (screen_x - radius, 0), (screen_x + radius, 0), |x, _| {
                 for_coord_in_line(false, (0, screen_y - radius), (0, screen_y + radius), |_, y| {
-                    if (x - screen_x).pow(2) + (y - screen_y).pow(2) <= radius.pow(2) {
+                    if (x - screen_x).pow(2) + (y - screen_y).pow(2) < radius.pow(2) {
                         if x < 0 || y < 0 {
                             return;
                         }

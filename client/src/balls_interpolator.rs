@@ -47,6 +47,8 @@ impl Component<GameState> for BallsInterpolatorComponent {
                 let interpolated_ball = Ball {
                     x,
                     y,
+                    // to avoid interpolating across the screen when the player respawns
+                    dead: old_ball.dead,
                     ..new_ball.clone()
                 };
 

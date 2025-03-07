@@ -3,10 +3,10 @@ use std::io;
 use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use clap::Parser;
 use crossterm::event::KeyCode;
-use spacetimedb_sdk::Identity;
+use spacetimedb_sdk::{Identity, Timestamp};
 use teng::components::Component;
 use teng::rendering::pixel::Pixel;
 use teng::rendering::renderer::Renderer;
@@ -98,6 +98,8 @@ struct GameComponent {
     // TODO: teng: allow modifying shared state before `.run()`
     receive_rx: Option<Receiver<ReceiveMessage>>,
     send_tx: Option<Sender<SendMessage>>,
+    last_tick: Timestamp,
+    last_frametime: Duration,
 }
 
 impl GameComponent {
@@ -105,6 +107,8 @@ impl GameComponent {
         Self {
             receive_rx: Some(receive_rx),
             send_tx: Some(send_tx),
+            last_tick: Timestamp::now(),
+            last_frametime: Duration::from_secs(0),
         }
     }
 
@@ -141,6 +145,11 @@ impl GameComponent {
                 ReceiveMessage::DeleteFood(id) => {
                     game_state.foods.remove(&id);
                 }
+                ReceiveMessage::NewPhysicsTick(t) => {
+                    let duration = t.duration_since(self.last_tick);
+                    self.last_frametime = duration.unwrap_or_default();
+                    self.last_tick = t;
+                }
             }
         }
     }
@@ -159,6 +168,7 @@ impl Component<GameState> for GameComponent {
         self.apply_messages(&mut shared_state.custom);
 
         shared_state.debug_info.custom.insert("balls_length".to_string(), format!("balls: {}", shared_state.custom.balls.len()));
+        shared_state.debug_info.custom.insert("frametime ms".to_string(), format!("frametime: {:.2}ms", self.last_frametime.as_millis()));
         
         
         // listen to keyboard events to apply impulses

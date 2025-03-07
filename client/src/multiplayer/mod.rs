@@ -3,7 +3,7 @@ mod module_bindings;
 use std::sync::mpsc::{Receiver, Sender};
 use module_bindings::*;
 
-use spacetimedb_sdk::{credentials, DbContext, Error, Event, Identity, ScheduleAt, Status, Table, TableWithPrimaryKey, TimeDuration};
+use spacetimedb_sdk::{credentials, DbContext, Error, Event, Identity, ScheduleAt, Status, Table, TableWithPrimaryKey, TimeDuration, Timestamp};
 
 pub use module_bindings::Ball;
 pub use module_bindings::Food;
@@ -21,6 +21,7 @@ pub enum ReceiveMessage {
     NewFood(Food),
     UpdateFood(Food),
     DeleteFood(u64),
+    NewPhysicsTick(Timestamp),
 }
 
 pub enum SendMessage {
@@ -119,7 +120,7 @@ fn register_callbacks(ctx: &DbConnection, tx: Sender<ReceiveMessage>) {
             tx.send(ReceiveMessage::DeleteBall(ball.identity)).unwrap();
         });
     }
-    
+
     // foods
     {
         let tx = tx.clone();
@@ -141,12 +142,20 @@ fn register_callbacks(ctx: &DbConnection, tx: Sender<ReceiveMessage>) {
             tx.send(ReceiveMessage::DeleteFood(food.id)).unwrap();
         });
     }
+    
+    // physics ticks inserts
+    {
+        let tx = tx.clone();
+        ctx.db.physics_ticks().on_insert(move |ctx, tick| {
+            tx.send(ReceiveMessage::NewPhysicsTick(tick.ticked_at)).unwrap();
+        });
+    }
 }
 
 /// Register subscriptions for all rows of both tables.
 fn subscribe_to_tables(ctx: &DbConnection) {
     ctx.subscription_builder()
-        .subscribe(["SELECT * FROM balls", "SELECT * FROM foods"]);
+        .subscribe(["SELECT * FROM balls", "SELECT * FROM foods", "SELECT * FROM physics_ticks"]);
 }
 
 // TODO: we don't need a creds store for tagars, since we don't have any auth nor persistent state.

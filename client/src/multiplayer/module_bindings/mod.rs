@@ -11,6 +11,8 @@ pub mod food_type;
 pub mod foods_table;
 pub mod identity_connected_reducer;
 pub mod identity_disconnected_reducer;
+pub mod physics_tick_type;
+pub mod physics_ticks_table;
 pub mod respawn_ball_reducer;
 pub mod respawn_balls_schedule_table;
 pub mod respawn_balls_schedule_type;
@@ -35,6 +37,8 @@ pub use identity_connected_reducer::{
 pub use identity_disconnected_reducer::{
     identity_disconnected, set_flags_for_identity_disconnected, IdentityDisconnectedCallbackId,
 };
+pub use physics_tick_type::PhysicsTick;
+pub use physics_ticks_table::*;
 pub use respawn_ball_reducer::{respawn_ball, set_flags_for_respawn_ball, RespawnBallCallbackId};
 pub use respawn_balls_schedule_table::*;
 pub use respawn_balls_schedule_type::RespawnBallsSchedule;
@@ -131,6 +135,7 @@ impl TryFrom<__ws::ReducerCallInfo<__ws::BsatnFormat>> for Reducer {
 pub struct DbUpdate {
     balls: __sdk::TableUpdate<Ball>,
     foods: __sdk::TableUpdate<Food>,
+    physics_ticks: __sdk::TableUpdate<PhysicsTick>,
     respawn_balls_schedule: __sdk::TableUpdate<RespawnBallsSchedule>,
     spawn_foods_schedule: __sdk::TableUpdate<SpawnFoodSchedule>,
     update_balls_schedule: __sdk::TableUpdate<UpdateBallsSchedule>,
@@ -144,6 +149,9 @@ impl TryFrom<__ws::DatabaseUpdate<__ws::BsatnFormat>> for DbUpdate {
             match &table_update.table_name[..] {
                 "balls" => db_update.balls = balls_table::parse_table_update(table_update)?,
                 "foods" => db_update.foods = foods_table::parse_table_update(table_update)?,
+                "physics_ticks" => {
+                    db_update.physics_ticks = physics_ticks_table::parse_table_update(table_update)?
+                }
                 "respawn_balls_schedule" => {
                     db_update.respawn_balls_schedule =
                         respawn_balls_schedule_table::parse_table_update(table_update)?
@@ -188,6 +196,9 @@ impl __sdk::DbUpdate for DbUpdate {
         diff.foods = cache
             .apply_diff_to_table::<Food>("foods", &self.foods)
             .with_updates_by_pk(|row| &row.id);
+        diff.physics_ticks = cache
+            .apply_diff_to_table::<PhysicsTick>("physics_ticks", &self.physics_ticks)
+            .with_updates_by_pk(|row| &row.tick_id);
         diff.respawn_balls_schedule = cache
             .apply_diff_to_table::<RespawnBallsSchedule>(
                 "respawn_balls_schedule",
@@ -217,6 +228,7 @@ impl __sdk::DbUpdate for DbUpdate {
 pub struct AppliedDiff<'r> {
     balls: __sdk::TableAppliedDiff<'r, Ball>,
     foods: __sdk::TableAppliedDiff<'r, Food>,
+    physics_ticks: __sdk::TableAppliedDiff<'r, PhysicsTick>,
     respawn_balls_schedule: __sdk::TableAppliedDiff<'r, RespawnBallsSchedule>,
     spawn_foods_schedule: __sdk::TableAppliedDiff<'r, SpawnFoodSchedule>,
     update_balls_schedule: __sdk::TableAppliedDiff<'r, UpdateBallsSchedule>,
@@ -234,6 +246,11 @@ impl<'r> __sdk::AppliedDiff<'r> for AppliedDiff<'r> {
     ) {
         callbacks.invoke_table_row_callbacks::<Ball>("balls", &self.balls, event);
         callbacks.invoke_table_row_callbacks::<Food>("foods", &self.foods, event);
+        callbacks.invoke_table_row_callbacks::<PhysicsTick>(
+            "physics_ticks",
+            &self.physics_ticks,
+            event,
+        );
         callbacks.invoke_table_row_callbacks::<RespawnBallsSchedule>(
             "respawn_balls_schedule",
             &self.respawn_balls_schedule,
@@ -826,6 +843,7 @@ impl __sdk::SpacetimeModule for RemoteModule {
     fn register_tables(client_cache: &mut __sdk::ClientCache<Self>) {
         balls_table::register_table(client_cache);
         foods_table::register_table(client_cache);
+        physics_ticks_table::register_table(client_cache);
         respawn_balls_schedule_table::register_table(client_cache);
         spawn_foods_schedule_table::register_table(client_cache);
         update_balls_schedule_table::register_table(client_cache);
