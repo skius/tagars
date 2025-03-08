@@ -25,16 +25,20 @@ struct Args {
     /// Run multithreaded?
     #[clap(short, long)]
     multithreaded: bool,
+    
+    /// Run reducers?
+    #[clap(short, long)]
+    reducers: bool,
 }
 
 fn main() {
     let args = Args::parse();
 
-    let url = args.server;
     
     if !args.multithreaded {
-        run_single_threaded(url, args.bots);
+        run_single_threaded(args);
     } else {
+        let url = args.server;
         for _ in 0..args.bots {
             let url = url.clone();
             thread::spawn(|| {
@@ -48,7 +52,10 @@ fn main() {
     }
 }
 
-fn run_single_threaded(url: String, num: u32) {
+fn run_single_threaded(args: Args) {
+    let url = args.server;
+    let num = args.bots;
+    
     let mut ctxs = Vec::new();
     for _ in 0..num {
         let ctx = connect_to_db(url.clone());
@@ -67,7 +74,9 @@ fn run_single_threaded(url: String, num: u32) {
             let impulse_x = angle.cos() * magnitude;
             let impulse_y = angle.sin() * magnitude;
 
-            // ctx.reducers.apply_impulse(impulse_x, impulse_y).unwrap();
+            if args.reducers {
+                ctx.reducers.apply_impulse(impulse_x, impulse_y).unwrap();
+            }
             ctx.frame_tick().unwrap();
         }
         thread::sleep(sleep_duration);
