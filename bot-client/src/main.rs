@@ -21,11 +21,11 @@ struct Args {
     /// The amount of bots to spawn
     #[clap(short, long, default_value = "1")]
     bots: u32,
-    
+
     /// Run multithreaded?
     #[clap(short, long)]
     multithreaded: bool,
-    
+
     /// Run reducers?
     #[clap(short, long)]
     reducers: bool,
@@ -34,7 +34,7 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    
+
     if !args.multithreaded {
         run_single_threaded(args);
     } else {
@@ -55,7 +55,7 @@ fn main() {
 fn run_single_threaded(args: Args) {
     let url = args.server;
     let num = args.bots;
-    
+
     let mut ctxs = Vec::new();
     for _ in 0..num {
         let ctx = connect_to_db(url.clone());
@@ -63,7 +63,7 @@ fn run_single_threaded(args: Args) {
     }
 
     let sleep_duration = std::time::Duration::from_millis(300);
-    
+
     let mut rng = rand::rng();
     loop {
         for ctx in &ctxs {
@@ -76,8 +76,8 @@ fn run_single_threaded(args: Args) {
 
             if args.reducers {
                 ctx.reducers.apply_impulse(impulse_x, impulse_y).unwrap();
+                ctx.frame_tick().unwrap();
             }
-            ctx.frame_tick().unwrap();
         }
         thread::sleep(sleep_duration);
     }
@@ -106,8 +106,8 @@ fn multiplayer_loop(url: String) {
         //     // spinloop
         // }
         thread::sleep(sleep_duration);
-        
-        
+
+
         // pick a ranom direction on the unit circle
         let angle = rand::random::<f64>() * 2.0 * std::f64::consts::PI;
         // pick a random magnitude
