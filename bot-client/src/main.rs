@@ -5,7 +5,7 @@ use module_bindings::*;
 use rand::Rng;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
-
+use std::time::Instant;
 use spacetimedb_sdk::{
     DbContext, Error, Event, Identity, ScheduleAt, Status, Table, TableWithPrimaryKey,
     TimeDuration, credentials,
@@ -21,22 +21,56 @@ struct Args {
     /// The amount of bots to spawn
     #[clap(short, long, default_value = "1")]
     bots: u32,
+    
+    /// Run multithreaded?
+    #[clap(short, long)]
+    multithreaded: bool,
 }
 
 fn main() {
     let args = Args::parse();
 
     let url = args.server;
+    
+    if !args.multithreaded {
+        run_single_threaded(url, args.bots);
+    } else {
+        for _ in 0..args.bots {
+            let url = url.clone();
+            thread::spawn(|| {
+                multiplayer_loop(url);
+            });
+        }
 
-    for _ in 0..args.bots {
-        let url = url.clone();
-        thread::spawn(|| {
-            multiplayer_loop(url);
-        });
+        loop {
+            thread::sleep(std::time::Duration::from_millis(1000));
+        }
+    }
+}
+
+fn run_single_threaded(url: String, num: u32) {
+    let mut ctxs = Vec::new();
+    for _ in 0..num {
+        let ctx = connect_to_db(url.clone());
+        ctxs.push(ctx);
     }
 
+    let sleep_duration = std::time::Duration::from_millis(300);
+    
+    let mut rng = rand::rng();
     loop {
-        thread::sleep(std::time::Duration::from_millis(1000));
+        for ctx in &ctxs {
+            // pick a ranom direction on the unit circle
+            let angle = rand::random::<f64>() * 2.0 * std::f64::consts::PI;
+            // pick a random magnitude
+            let magnitude = rng.random::<f64>() * 3.0;
+            let impulse_x = angle.cos() * magnitude;
+            let impulse_y = angle.sin() * magnitude;
+
+            // ctx.reducers.apply_impulse(impulse_x, impulse_y).unwrap();
+            ctx.frame_tick().unwrap();
+        }
+        thread::sleep(sleep_duration);
     }
 }
 
@@ -54,11 +88,17 @@ fn multiplayer_loop(url: String) {
     ctx.run_threaded();
 
     let mut rng = rand::thread_rng();
-    let sleep_duration = std::time::Duration::from_millis(300);
+    let sleep_duration = std::time::Duration::from_millis(1000);
 
     // Handle input
     loop {
+        // let wait_until = std::time::Instant::now() + sleep_duration;
+        // while Instant::now() < wait_until {
+        //     // spinloop
+        // }
         thread::sleep(sleep_duration);
+        
+        
         // pick a ranom direction on the unit circle
         let angle = rand::random::<f64>() * 2.0 * std::f64::consts::PI;
         // pick a random magnitude

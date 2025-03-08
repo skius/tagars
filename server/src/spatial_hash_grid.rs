@@ -1,6 +1,9 @@
 use std::collections::HashMap;
+use spacetimedb::{SpacetimeType};
+use serde_with::serde_as;
+use serde::Deserialize;
 
-#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, SpacetimeType)]
 pub struct Cell {
     pub x: i64,
     pub y: i64,
@@ -27,6 +30,18 @@ impl Aabb {
         let max_y = (self.max_y as f64 / cell_size as f64).floor() as i64;
         (min_x..=max_x).flat_map(move |x| (min_y..=max_y).map(move |y| Cell { x, y }))
     }
+}
+
+#[derive(SpacetimeType)]
+struct Elt<T> {
+    key: Cell,
+    value: Vec<T>,
+}
+
+#[derive(SpacetimeType)]
+pub struct SpatialHashGridStored<T> {
+    grid: Vec<Elt<T>>,
+    cell_size: i64,
 }
 
 pub struct SpatialHashGrid<T> {
