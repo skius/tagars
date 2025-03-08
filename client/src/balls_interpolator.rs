@@ -38,6 +38,7 @@ impl Component<GameState> for BallsInterpolatorComponent {
                 let timestamp_at_old = old_and_new_ball.timestamp_at_old;
                 let timestamp_now = update_info.current_time;
                 let time_since_old = (timestamp_now - timestamp_at_old).as_secs_f64();
+                // if you comment this out, you get some extrapolation if the server is running below PHYSICS_TICKS_PER_SECOND
                 let time_since_old = time_since_old.min(physics_tick_duration);
 
                 let fraction = time_since_old / physics_tick_duration;
