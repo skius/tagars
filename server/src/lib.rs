@@ -328,6 +328,9 @@ fn update_balls(ctx: &ReducerContext, _schedule: UpdateBallsSchedule) {
     }
 
     // Update collisions
+    // Note: at 4000 balls, this is around ~45-50ms, while below shg implementation is ~30-35ms
+    // TODO: also use shg to update foods.
+    // TODO: store shg across ticks
     // for ball1_idx in 0..balls.len() {
     //     if balls[ball1_idx].dead {
     //         continue;
