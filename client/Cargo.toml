@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-teng = { version = "0.4.5", path = "../../teng" }
+teng = { version = "0.5", path = "../../teng" }
 crossterm = "0.28.1"
 spacetimedb-sdk = "1.0"
 anyhow = "1.0"

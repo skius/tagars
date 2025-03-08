@@ -6,7 +6,7 @@ use clap::Parser;
 use crossterm::event::KeyCode;
 use spacetimedb_sdk::{Identity, Timestamp};
 use std::collections::HashMap;
-use std::io;
+use std::{io, thread};
 use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
@@ -20,10 +20,7 @@ use teng::rendering::renderer::Renderer;
 use teng::util::for_coord_in_line;
 use teng::util::planarvec::Bounds;
 use teng::util::planarvec2_experimental::ExponentialGrowingBounds;
-use teng::{
-    Game, SetupInfo, SharedState, UpdateInfo, install_panic_handler, terminal_cleanup,
-    terminal_setup,
-};
+use teng::{Game, SetupInfo, SharedState, UpdateInfo, install_panic_handler, terminal_cleanup, terminal_setup, CustomBufWriter};
 
 mod balls_interpolator;
 mod multiplayer;
@@ -45,12 +42,18 @@ struct Args {
 fn main() -> anyhow::Result<()> {
     terminal_setup()?;
     install_panic_handler();
+    // we need to exit on panic, see TODO in teng::install_panic_handler
+    let old_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        old_hook(panic_info);
+        std::process::exit(1);
+    }));
 
     let args = Args::parse();
 
     let (receive_rx, send_tx) = multiplayer::connect_to(args.server)?;
 
-    let mut game = Game::new_with_custom_buf_writer();
+    let mut game: Game<CustomBufWriter, GameState> = Game::new_with_custom_buf_writer();
     game.install_recommended_components();
     game.add_component(Box::new(GameComponent::new(receive_rx, send_tx)));
     game.add_component(Box::new(BallsInterpolatorComponent::new(args.interpolate)));
